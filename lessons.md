@@ -102,6 +102,15 @@
 - 準則：資安 Exit Criteria 的對象是**出貨的產品程式碼**。SAST job 明確 `--exclude=test --exclude=src/vendor`，
   只掃 `src main.js preload.js`。範圍對齊語意，gate 才不會被非出貨碼的雜訊擋住而失去意義。
 
+**12. CI 紅燈先分「gate 判定紅」還是「基礎設施紅」——別把配額問題當成安全失敗**
+- 情境：首次推送後 secret-scan（gitleaks-action@v2）紅燈，但 log 明寫 `no leaks found`。
+- 準則：**看 log 找真正的退出原因**。本例 gitleaks 掃描本身是綠的（無密鑰），job 失敗在掃完後
+  上傳 SARIF artifact 撞到帳號的 Actions 儲存配額（`Artifact storage quota has been hit`）——
+  是基礎設施問題，不是安全回歸。修法＝**讓 gate 只綁「掃描結果」，剝離無關的副作用**：
+  改用 `ghcr.io/gitleaks/gitleaks` 容器直接跑 `gitleaks dir . --exit-code=1`，不經 action 的 artifact 上傳。
+  同理 release workflow 把 build 與 publish 合成單一 job、以「Release 資產」發佈安裝檔，
+  不走 `upload/download-artifact`，同樣避開該配額。**不可為了讓 CI 變綠而放寬安全門檻，但可以移除與門檻無關的失敗源。**
+
 **11. 桌面 app 的 CD 要誠實對應，不要硬套伺服器那套**
 - 情境：cd-pipeline 預設 Staging→Smoke→E2E→部署→流量健康檢查，但這是離線桌面程式，沒有伺服器與線上流量。
 - 準則：**保留 CD 的精神（打包前煙霧測試、人工放行、產物完整性），對應到桌面情境**：

@@ -33,11 +33,15 @@ jobs:
       - run: npm test
       - run: npm run verify
 
-  # 在 Windows runner 上打包，產出安裝檔與免安裝版
-  build-windows:
-    name: 建置 Windows 安裝檔
+  # 在 Windows runner 上打包並直接發佈 Release（= 桌面 app 的「部署上線」）。
+  # 打包與發佈合併在同一 job，安裝檔以「Release 資產」上傳，
+  # 不經 actions/upload-artifact，避免 Actions 儲存配額造成發佈失敗。
+  build-and-publish:
+    name: 建置 Windows 安裝檔並發佈 Release
     needs: smoke
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,25 +51,6 @@ jobs:
         run: npm install
       - name: 打包（NSIS 安裝檔 + portable 免安裝版）
         run: npm run build
-      - name: 上傳建置產物
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installers
-          path: |
-            dist/*.exe
-            dist/*.blockmap
-          if-no-files-found: error
-
-  # 發佈 GitHub Release（= 桌面 app 的「部署上線」）
-  publish:
-    name: 發佈 GitHub Release
-    needs: build-windows
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-installers
-          path: dist
       - name: 建立 Release 並附上安裝檔
         uses: softprops/action-gh-release@v2
         with:

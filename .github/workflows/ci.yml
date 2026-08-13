@@ -45,17 +45,18 @@ jobs:
         run: npm audit --audit-level=high
 
   # 維度：資安 —— 硬編碼密鑰（任何命中擋 build）
+  # 直接執行 gitleaks 二進位掃描檔案，gate = 實際掃描結果。
+  # 不用 gitleaks-action wrapper，以免其 SARIF artifact 上傳受 Actions
+  # 儲存配額影響而在「無密鑰」時仍紅燈（假性失敗）。
   secret-scan:
     name: 資安 — 密鑰掃描
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/gitleaks/gitleaks:latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Gitleaks（掃描工作區檔案，命中即擋 build）
+        run: gitleaks dir . --no-banner --redact --exit-code=1
 
   # 維度：資安 —— SAST（Critical/High 擋 build）
   # 只掃「出貨的產品程式碼」：排除 test/（非出貨、含測試用 eval）與
