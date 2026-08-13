@@ -7,18 +7,28 @@
 #     - 交付物（artifact）＝ Windows 安裝檔（NSIS）與免安裝版（portable）
 #     - 「部署」＝ 把安裝檔發佈為 GitHub Release 供使用者下載
 #     - 「Smoke Test」＝ 打包前先在 CI 重跑 test + 反解驗證（沿用 G5 gate）
-#     - 「人工審核 Gate」＝ 推送版本 tag（v*）這個動作本身即人工放行點
+#     - 「人工審核 Gate」＝ 推版本 tag 或手動觸發這個動作本身即人工放行點
 #     - 「健康檢查」＝ electron-builder 打包成功 + artifact 完整產出
 #
-# 觸發：推送 v 開頭的版本 tag（例如 v1.0.0）。
+# 觸發兩種方式：
+#   1. 推送 v 開頭的版本 tag（例如 v1.0.0）。
+#   2. 手動於 Actions 頁面觸發（workflow_dispatch），輸入版本號。
+#      手動觸發時由 action-gh-release 以 GITHUB_TOKEN 經 GitHub API 建立 tag，
+#      不需 git tag push 權限。
 name: release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本 tag（例如 v1.0.0）"
+        required: true
+        default: "v1.0.0"
 
 permissions:
-  contents: write   # 發佈 Release 需要
+  contents: write   # 發佈 Release / 建立 tag 需要
 
 jobs:
   # 打包前先重跑 G5 的功能/品質 gate（Smoke Test 等效）
@@ -54,6 +64,8 @@ jobs:
       - name: 建立 Release 並附上安裝檔
         uses: softprops/action-gh-release@v2
         with:
+          # tag 推送時用該 tag；手動觸發時用輸入的版本號（此時由 API 建立 tag）
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
           files: |
             dist/*.exe
             dist/*.blockmap
