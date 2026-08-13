@@ -1,0 +1,24 @@
+# 相依套件
+node_modules/
+
+# 建置產物
+dist/
+build/
+out/
+
+# 測試暫存（run-tests.ps1 產生的 UTF-16 暫存檔）
+test/.*.tmp.js
+test/*.log
+
+# 使用者可能誤存進專案的個資輸出
+*.vcf
+*-qrcode.png
+
+# 作業系統
+Thumbs.db
+.DS_Store
+
+# 編輯器
+.vscode/
+.idea/
+*.swp

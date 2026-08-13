@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<!-- CSP：只允許本地資源，禁止任何外部連線（NFR-02 離線硬需求）-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; form-action 'none'; base-uri 'none';">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vCard QRCode 產生器</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1 class="app-title">vCard QRCode 產生器</h1>
+  <div class="badges">
+    <span class="badge">vCard 3.0</span>
+    <span class="badge badge-offline" title="本程式不會發出任何網路請求">● 離線運作</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ============ 左欄：輸入 ============ -->
+  <section class="pane pane-input" aria-labelledby="input-heading">
+    <h2 id="input-heading" class="visually-hidden">聯絡資料輸入</h2>
+
+    <form id="vcard-form" autocomplete="off" novalidate>
+
+      <fieldset class="group">
+        <legend>基本身分</legend>
+        <div class="row row-2">
+          <div class="field">
+            <label for="lastName">姓</label>
+            <input type="text" id="lastName" name="lastName" placeholder="王">
+          </div>
+          <div class="field">
+            <label for="firstName">名</label>
+            <input type="text" id="firstName" name="firstName" placeholder="小明">
+          </div>
+        </div>
+        <div class="field">
+          <label for="fullName">顯示名稱 <span class="hint">（留空自動組合姓名）</span></label>
+          <input type="text" id="fullName" name="fullName" placeholder="王小明">
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>聯絡方式</legend>
+        <div class="field">
+          <label for="cell">手機</label>
+          <input type="tel" id="cell" name="cell" placeholder="0912-345-678">
+        </div>
+        <div class="row row-2">
+          <div class="field">
+            <label for="workTel">公司電話</label>
+            <input type="tel" id="workTel" name="workTel" placeholder="02-1234-5678">
+          </div>
+          <div class="field">
+            <label for="homeTel">住家電話</label>
+            <input type="tel" id="homeTel" name="homeTel" placeholder="03-987-6543">
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">電子郵件</label>
+          <input type="email" id="email" name="email" placeholder="ming@example.com"
+                 aria-describedby="email-error">
+          <p class="field-error" id="email-error" role="alert" hidden></p>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>工作資訊</legend>
+        <div class="field">
+          <label for="org">公司／組織</label>
+          <input type="text" id="org" name="org" placeholder="範例科技股份有限公司">
+        </div>
+        <div class="row row-2">
+          <div class="field">
+            <label for="title">職稱</label>
+            <input type="text" id="title" name="title" placeholder="產品經理">
+          </div>
+          <div class="field">
+            <label for="url">網站</label>
+            <input type="url" id="url" name="url" placeholder="https://example.com">
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>地址與備註</legend>
+        <div class="field">
+          <label for="street">街道</label>
+          <input type="text" id="street" name="street" placeholder="信義路五段 7 號">
+        </div>
+        <div class="row row-3">
+          <div class="field">
+            <label for="city">城市</label>
+            <input type="text" id="city" name="city" placeholder="台北市">
+          </div>
+          <div class="field">
+            <label for="region">縣市／州</label>
+            <input type="text" id="region" name="region" placeholder="信義區">
+          </div>
+          <div class="field">
+            <label for="postalCode">郵遞區號</label>
+            <input type="text" id="postalCode" name="postalCode" placeholder="110">
+          </div>
+        </div>
+        <div class="field">
+          <label for="country">國家</label>
+          <input type="text" id="country" name="country" placeholder="台灣">
+        </div>
+        <div class="field">
+          <label for="note">備註</label>
+          <textarea id="note" name="note" rows="2" placeholder="其他想附註的資訊"></textarea>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>自訂欄位</legend>
+        <p class="group-hint">
+          規格外的資料放這裡（例如 LINE ID、社群帳號）。非標準名稱會自動加上
+          <code>X-</code> 前綴以符合 vCard 規範。
+        </p>
+        <div id="custom-list" class="custom-list"></div>
+        <p id="custom-empty" class="empty-note">尚未新增自訂欄位</p>
+        <button type="button" id="add-custom" class="btn btn-secondary">＋ 新增欄位</button>
+      </fieldset>
+
+      <div class="form-actions">
+        <button type="button" id="load-sample" class="btn btn-ghost">填入範例資料</button>
+        <button type="button" id="clear-all" class="btn btn-ghost btn-danger">清空全部</button>
+      </div>
+
+    </form>
+  </section>
+
+  <!-- ============ 右欄：即時預覽 ============ -->
+  <section class="pane pane-preview" aria-labelledby="preview-heading">
+    <h2 id="preview-heading" class="visually-hidden">QRCode 即時預覽</h2>
+
+    <div class="preview-sticky">
+
+      <div class="qr-stage">
+        <!-- 狀態一：QR 已產生 -->
+        <canvas id="qr-canvas" width="320" height="320"
+                role="img" aria-label="vCard QRCode 預覽"></canvas>
+
+        <!-- 狀態二：空狀態 -->
+        <div id="qr-empty" class="qr-placeholder">
+          <div class="placeholder-icon" aria-hidden="true">▦</div>
+          <p class="placeholder-title">請在左方輸入資料</p>
+          <p class="placeholder-desc">至少填寫姓名，QRCode 會即時出現在這裡</p>
+        </div>
+
+        <!-- 狀態三：錯誤（資料過長等）-->
+        <div id="qr-error" class="qr-placeholder qr-placeholder-error" role="alert" hidden>
+          <div class="placeholder-icon" aria-hidden="true">⚠</div>
+          <p class="placeholder-title">無法產生 QRCode</p>
+          <p class="placeholder-desc" id="qr-error-msg"></p>
+        </div>
+      </div>
+
+      <!-- 即時狀態播報（螢幕閱讀器）-->
+      <p id="qr-status" class="visually-hidden" role="status" aria-live="polite"></p>
+
+      <div class="qr-meta">
+        <span id="meta-version" class="meta-item">—</span>
+        <span id="meta-bytes" class="meta-item">—</span>
+      </div>
+
+      <div class="capacity">
+        <div class="capacity-bar">
+          <div id="capacity-fill" class="capacity-fill" style="width:0%"></div>
+        </div>
+        <p id="capacity-text" class="capacity-text">資料量：0 位元組</p>
+      </div>
+
+      <div class="control-row">
+        <span class="control-label" id="ecc-label">容錯等級</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="ecc-label">
+          <button type="button" class="seg" data-ecc="L" role="radio" aria-checked="false" title="低容錯，QR 較小">L</button>
+          <button type="button" class="seg is-active" data-ecc="M" role="radio" aria-checked="true" title="中容錯（建議）">M</button>
+          <button type="button" class="seg" data-ecc="Q" role="radio" aria-checked="false" title="較高容錯">Q</button>
+          <button type="button" class="seg" data-ecc="H" role="radio" aria-checked="false" title="最高容錯，QR 較大">H</button>
+        </div>
+      </div>
+
+      <div class="download-row">
+        <button type="button" id="download-png" class="btn btn-primary" disabled>下載 PNG</button>
+        <button type="button" id="download-vcf" class="btn btn-secondary" disabled>下載 .vcf</button>
+      </div>
+
+      <details class="raw-block">
+        <summary>檢視 vCard 原始碼</summary>
+        <pre id="raw-vcard" class="raw-pre" aria-label="vCard 原始文字"></pre>
+      </details>
+
+    </div>
+  </section>
+
+</main>
+
+<script src="vendor/qrcode.js"></script>
+<script src="lib/vcard.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

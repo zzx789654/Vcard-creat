@@ -1,0 +1,37 @@
+{
+  "name": "vcard-qrcode-generator",
+  "version": "1.0.0",
+  "description": "完全離線的 vCard 3.0 QRCode 產生器：左側輸入聯絡資料，右側即時預覽 QRCode",
+  "main": "main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run-tests.js",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.local.vcard.qrcode",
+    "productName": "vCard QRCode Generator",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
