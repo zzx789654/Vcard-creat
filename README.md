@@ -30,7 +30,7 @@ npm run build            # 產生安裝檔 (NSIS) 與 portable 版
 npm run build:portable   # 只產生免安裝版
 ```
 
-> **注意**：目前這台機器尚未安裝 Node.js，因此 Electron 相關指令（`npm install` / `npm start` / `npm run build`）尚未實際驗證過。安裝 Node.js（建議 LTS 版本）之後即可執行。
+> Windows 安裝檔／免安裝版也會在推送版本 tag（`v*`）時，由 GitHub Actions 的 `release` workflow 自動打包並發佈到 GitHub Release（見下方「持續整合／交付」）。
 
 ---
 
@@ -65,8 +65,12 @@ Vcard-creat/
 │   ├── test-cases.js        測試案例（兩個 runner 共用）
 │   ├── run-tests.js         單元測試 runner（Node 版）
 │   ├── run-tests-wsh.js     單元測試 runner（無 Node 時的 Windows 版）
-│   ├── run-tests.ps1        無 Node 環境的測試啟動器
-│   └── verify-qr-decode.js  QR 反解端到端驗證
+│   ├── run-tests.ps1             無 Node 環境的測試啟動器
+│   ├── verify-qr-decode.js       QR 反解端到端驗證（Windows / cscript 版）
+│   └── verify-qr-decode-node.js  QR 反解端到端驗證（Node / CI 版）
+├── .github/workflows/
+│   ├── ci.yml           持續整合：測試 + SCA + 密鑰掃描 + SAST
+│   └── release.yml      持續交付：打包 Windows 安裝檔並發佈 Release
 ├── CoreMain.md          專案中心思想
 ├── SRS.md               需求規格
 └── 待修改.md            開發計畫與關卡狀態
@@ -79,7 +83,8 @@ Vcard-creat/
 ### 有安裝 Node.js
 
 ```bash
-npm test
+npm test         # 60 條單元測試
+npm run verify   # 7 條 QR 反解端到端驗證
 ```
 
 ### 沒有安裝 Node.js（Windows）
@@ -111,7 +116,26 @@ powershell -ExecutionPolicy Bypass -File test\run-tests.ps1
 
 已通過靜態安全檢查：**Critical = 0、High = 0、無硬編碼密鑰**。
 
-> 尚未執行相依套件 CVE 掃描（`npm audit`），因為本機無 Node.js 與 `package-lock.json`。建議在有網路的環境補跑並提交 lockfile。
+相依套件 CVE 掃描（SCA）：已提交 `package-lock.json`，`npm audit` 為 **0 弱點**。
+產品執行期零相依（QR 編碼器與 vCard 產生器皆自行內嵌），`npm audit --omit=dev` 亦為 0；
+建置工具鏈（electron / electron-builder）已升級至已修補的安全版本。
+
+---
+
+## 持續整合／交付（CI/CD）
+
+以 GitHub Actions 把品質與安全門檻自動化，每次 push / PR 都重新驗證：
+
+| Workflow | 觸發 | 內容 |
+|---|---|---|
+| **`ci.yml`（G5）** | push / PR | 功能+品質：`npm test` + `npm run verify` + 語法檢查；資安：`npm audit`（SCA）、Gitleaks（密鑰）、Semgrep（SAST，僅掃產品碼）。任一未達標即擋 build。 |
+| **`release.yml`（G6）** | 推送 `v*` tag | 打包前重跑測試 → 於 Windows runner 以 electron-builder 產出 NSIS 安裝檔與 portable 版 → 發佈 GitHub Release。 |
+
+發佈新版本：
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 ---
 

@@ -8,12 +8,13 @@
   "scripts": {
     "start": "electron .",
     "test": "node test/run-tests.js",
+    "verify": "node test/verify-qr-decode-node.js",
     "build": "electron-builder --win --x64",
     "build:portable": "electron-builder --win portable --x64"
   },
   "devDependencies": {
-    "electron": "^32.0.0",
-    "electron-builder": "^25.0.0"
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.local.vcard.qrcode",

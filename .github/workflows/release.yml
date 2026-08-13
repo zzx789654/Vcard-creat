@@ -1,0 +1,75 @@
+# Secure SDLC — 階段 6 / Gate G6（持續交付）
+#
+# 桌面應用的 CD 對應（誠實調整）：
+#   本專案是「完全離線的 Electron 桌面程式」，沒有伺服器 Staging / 線上 E2E /
+#   正式流量健康檢查，因此 cd-pipeline 的「Staging→Smoke→E2E→部署→健康檢查」
+#   對應為桌面情境的等效步驟：
+#     - 交付物（artifact）＝ Windows 安裝檔（NSIS）與免安裝版（portable）
+#     - 「部署」＝ 把安裝檔發佈為 GitHub Release 供使用者下載
+#     - 「Smoke Test」＝ 打包前先在 CI 重跑 test + 反解驗證（沿用 G5 gate）
+#     - 「人工審核 Gate」＝ 推送版本 tag（v*）這個動作本身即人工放行點
+#     - 「健康檢查」＝ electron-builder 打包成功 + artifact 完整產出
+#
+# 觸發：推送 v 開頭的版本 tag（例如 v1.0.0）。
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # 發佈 Release 需要
+
+jobs:
+  # 打包前先重跑 G5 的功能/品質 gate（Smoke Test 等效）
+  smoke:
+    name: 打包前煙霧測試（重跑測試 + 反解驗證）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test
+      - run: npm run verify
+
+  # 在 Windows runner 上打包，產出安裝檔與免安裝版
+  build-windows:
+    name: 建置 Windows 安裝檔
+    needs: smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 安裝相依（含 electron 建置工具）
+        run: npm install
+      - name: 打包（NSIS 安裝檔 + portable 免安裝版）
+        run: npm run build
+      - name: 上傳建置產物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+          if-no-files-found: error
+
+  # 發佈 GitHub Release（= 桌面 app 的「部署上線」）
+  publish:
+    name: 發佈 GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installers
+          path: dist
+      - name: 建立 Release 並附上安裝檔
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+          generate_release_notes: true
