@@ -102,6 +102,14 @@
 - 準則：資安 Exit Criteria 的對象是**出貨的產品程式碼**。SAST job 明確 `--exclude=test --exclude=src/vendor`，
   只掃 `src main.js preload.js`。範圍對齊語意，gate 才不會被非出貨碼的雜訊擋住而失去意義。
 
+**13. 未簽章桌面 app 的 Windows 告警是「發佈信任」問題，不是程式問題**
+- 情境：electron-builder 產出的安裝檔在 Windows 首次執行跳 SmartScreen「Windows 已保護您的電腦」。
+- 準則：這是**未做受信任程式碼簽章**造成，與程式安全無關。唯一能真正消除的方法是用受信任憑證簽章
+  （EV 立即無告警、OV 靠信譽累積）。**自用情境**可用純 PowerShell（`New-SelfSignedCertificate` +
+  匯入 CurrentUser Root/TrustedPublisher + `Set-AuthenticodeSignature` + `Unblock-File`）在自己機器上簽並信任，
+  不需 Windows SDK、不需上傳私鑰到 CI——但只對「手動信任過的機器」有效，對外散佈仍需商業憑證。
+  另注意（延續教訓 3）：**PowerShell 輔助腳本的註解與訊息一律純 ASCII**，中文說明放 README，避免 PS 5.1 ANSI 讀檔吃行。
+
 **12. CI 紅燈先分「gate 判定紅」還是「基礎設施紅」——別把配額問題當成安全失敗**
 - 情境：首次推送後 secret-scan（gitleaks-action@v2）紅燈，但 log 明寫 `no leaks found`。
 - 準則：**看 log 找真正的退出原因**。本例 gitleaks 掃描本身是綠的（無密鑰），job 失敗在掃完後

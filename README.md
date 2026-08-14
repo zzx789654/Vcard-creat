@@ -139,6 +139,39 @@ git tag v1.0.0 && git push origin v1.0.0
 
 ---
 
+## 首次執行的 Windows 告警（SmartScreen）與自簽章
+
+因為安裝檔沒有用「受信任的商業憑證」做程式碼簽章，Windows 首次執行時會跳出
+**「Windows 已保護您的電腦 / Windows protected your PC」**（SmartScreen）或
+「未知發行者」告警。這是發佈信任問題，與程式安全無關。
+
+最簡單的一次性處理：按 **「其他資訊」→「仍要執行」** 即可，之後同一支檔案不再跳。
+
+### 自用：用自簽憑證讓自己的電腦完全不跳告警
+
+若希望在**自己的電腦**上完全無告警，可用內附的純 PowerShell 腳本
+`scripts/trust-and-sign.ps1`（不需 Windows SDK、不需 Node、不上傳任何私鑰）。
+原理：產生一張自簽的程式碼簽章憑證、裝進「你這台電腦」的受信任憑證區，
+再用它簽章下載下來的安裝檔——Windows 就會信任它。
+
+```powershell
+# 步驟一（只需一次）：產生憑證並加入本機信任
+powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1
+
+# 步驟二（每次下載新安裝檔後執行）：簽章該安裝檔並移除「網路來源」標記
+powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1 `
+  -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.0.0.exe"
+```
+
+完成後在**你信任過的這台電腦**上執行就不會再跳告警。
+
+> **範圍限制（誠實說明）**：自簽憑證只在「你手動信任過的機器」上有效。
+> 要對**外部使用者**散佈且完全消除告警，需購買 EV／OV 商業程式碼簽章憑證
+> （EV 立即無告警；OV 需累積下載信譽），再把 electron-builder 的簽章設定接上
+> CI 的 GitHub Secrets。此專案定位為離線自用工具，故預設走自簽路線。
+
+---
+
 ## 已知限制
 
 - **不內嵌大頭照（PHOTO）**：會使 QR 資料量暴增到難以掃描，違反核心價值。
