@@ -5,6 +5,7 @@
   "main": "main.js",
   "private": true,
   "license": "MIT",
+  "author": "zzx789654",
   "scripts": {
     "start": "electron .",
     "test": "node test/run-tests.js",

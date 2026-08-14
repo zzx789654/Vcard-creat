@@ -60,7 +60,10 @@ jobs:
       - name: 安裝相依（含 electron 建置工具）
         run: npm install
       - name: 打包（NSIS 安裝檔 + portable 免安裝版）
-        run: npm run build
+        # --publish never：electron-builder 只打包，不自行發佈。
+        # 偵測到 CI 時它會嘗試 implicit publish 而要求 GH_TOKEN，
+        # 這裡明確關閉，發佈統一交給下一步的 action-gh-release。
+        run: npm run build -- --publish never
       - name: 建立 Release 並附上安裝檔
         uses: softprops/action-gh-release@v2
         with:
