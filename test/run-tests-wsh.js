@@ -98,13 +98,16 @@ function loadFile(fullPath) {
 }
 
 loadFile(fso.BuildPath(srcDir, 'lib\\vcard.js'));
+loadFile(fso.BuildPath(srcDir, 'lib\\csv.js'));
 loadFile(fso.BuildPath(srcDir, 'vendor\\qrcode.js'));
 
 var VCard = window.VCard;
 var QRCodeLib = window.QRCodeLib;
+var CSV = window.CSV;
 
 if (!VCard) throw new Error('VCard 未正確載入');
 if (!QRCodeLib) throw new Error('QRCodeLib 未正確載入');
+if (!CSV) throw new Error('CSV 未正確載入');
 
 // ---- 極簡測試框架 ----
 var pass = 0, fail = 0, failures = [];
@@ -170,7 +173,7 @@ globalTestRegistry.defineTestCases({
   assert: assert, assertEqual: assertEqual,
   assertContains: assertContains, assertThrows: assertThrows,
   repeat: repeat,
-  VCard: VCard, QRCodeLib: QRCodeLib
+  VCard: VCard, QRCodeLib: QRCodeLib, CSV: CSV
 });
 
 // ---- 統計 ----

@@ -465,3 +465,147 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* =========================================================
+   批次匯入頁
+   ========================================================= */
+.badge-link {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.badge-link:hover { border-color: var(--accent); }
+
+.batch-layout {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--gap-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+}
+
+.batch-controls {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-lg);
+}
+
+.batch-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.batch-steps li { display: flex; gap: 12px; align-items: flex-start; }
+
+.step-num {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-body { flex: 1 1 auto; min-width: 0; }
+.step-title { margin: 2px 0 4px; font-weight: 600; }
+.step-hint { margin: 6px 0; font-size: 12.5px; color: var(--text-muted); }
+
+.file-input {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.batch-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.batch-summary { margin: 16px 0 0; font-size: 13px; color: var(--text-muted); }
+.batch-error {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.sheet-empty { color: var(--text-muted); font-style: italic; }
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.qr-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  break-inside: avoid;
+}
+
+.qr-card-canvas {
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  image-rendering: pixelated;   /* QR 保持銳利，不做插值模糊 */
+  background: #ffffff;
+  border-radius: 4px;
+}
+
+.qr-card-canvas-empty {
+  aspect-ratio: 1 / 1;
+  max-width: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.qr-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  word-break: break-word;
+}
+.qr-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.qr-card-error { border-color: var(--danger); }
+.qr-card-error .qr-card-sub { color: var(--danger); }
+
+/* ---------- 列印：只留總表，每格不跨頁 ---------- */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #ffffff; color: #000000; }
+  .batch-layout { padding: 0; overflow: visible; }
+  .sheet-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .qr-card { border-color: #cccccc; }
+  .qr-card-canvas { max-width: 150px; }
+}

@@ -14,7 +14,7 @@ function defineTestCases(ctx) {
   var assert = ctx.assert, assertEqual = ctx.assertEqual;
   var assertContains = ctx.assertContains, assertThrows = ctx.assertThrows;
   var repeat = ctx.repeat;
-  var VCard = ctx.VCard, QRCodeLib = ctx.QRCodeLib;
+  var VCard = ctx.VCard, QRCodeLib = ctx.QRCodeLib, CSV = ctx.CSV;
   // =================================================================
   log('');
   log('--- TC-100 系列：vCard 3.0 結構（FR-03 / AC-03）---');
@@ -422,6 +422,69 @@ function defineTestCases(ctx) {
     });
     var qr = QRCodeLib.make(vcard, 'M');
     assert(qr.moduleCount > 0, '特殊字元名片應可編碼');
+  });
+
+  log('');
+  log('--- TC-700 系列：批次 CSV 匯入（大量產生）---');
+
+  test('TC-701 基本解析：欄位對應與多列', function () {
+    var r = CSV.toContacts('姓,名,手機,Email\r\n王,小明,0912,ming@ex.com\r\nLin,Da,0922,da@ex.com\r\n');
+    assertEqual(r.fields.join(','), 'lastName,firstName,cell,email', '標題應對應到欄位鍵');
+    assertEqual(r.contacts.length, 2, '應解析出兩筆');
+    assertEqual(r.contacts[0].lastName, '王');
+    assertEqual(r.contacts[1].email, 'da@ex.com');
+  });
+
+  test('TC-702 引號欄位可含逗號與換行、"" 逸出', function () {
+    var rows = CSV.parse('a,"b,c","x\ny","he ""hi"""\n');
+    assertEqual(rows[0][1], 'b,c', '引號內逗號不分欄');
+    assertEqual(rows[0][2], 'x\ny', '引號內換行保留');
+    assertEqual(rows[0][3], 'he "hi"', '雙引號逸出還原');
+  });
+
+  test('TC-703 略過完全空白的資料列', function () {
+    var r = CSV.toContacts('姓,手機\r\n王,0912\r\n,,\r\n \r\nLin,0922\r\n');
+    assertEqual(r.contacts.length, 2, '空列不應計入');
+    assert(r.skipped >= 1, '應記錄略過列數');
+  });
+
+  test('TC-704 中英文標題別名皆可對應、未知標題被收集', function () {
+    var r = CSV.toContacts('Last Name,mobile,公司,亂碼欄\r\nWang,0912,ACME,x\r\n');
+    assertEqual(r.fields.join(','), 'lastName,cell,org', '英文與中文別名都應對應');
+    assertEqual(r.unknownHeaders.join(','), '亂碼欄', '未知標題應被收集供提示');
+  });
+
+  test('TC-705 去除 BOM 與空白標題', function () {
+    var r = CSV.toContacts('﻿姓 , 手機 \r\n王,0912\r\n');
+    assertEqual(r.fields.join(','), 'lastName,cell', 'BOM 與標題前後空白不影響對應');
+  });
+
+  test('TC-706 批次每列 → vCard → QR 端到端可產生', function () {
+    var r = CSV.toContacts('姓,名,手機,公司\r\n王,小明,0912345678,範例科技\r\nLin,Da,0922333444,ACME\r\n');
+    r.contacts.forEach(function (c) {
+      var vcard = VCard.build(c);
+      assertContains(vcard, 'BEGIN:VCARD', '每列都應能組出 vCard');
+      var qr = QRCodeLib.make(vcard, 'M');
+      assert(qr.moduleCount > 0, '每列都應能產生 QR');
+    });
+  });
+
+  test('TC-707 範本可被自身解析並對應回全部欄位', function () {
+    var r = CSV.toContacts(CSV.template());
+    assertEqual(r.fields.length, CSV.FIELD_ORDER.length, '範本標題應對應到全部欄位');
+    assertEqual(r.contacts.length, 1, '範本含一列範例');
+    assertEqual(r.contacts[0].fullName, '王小明', '範例資料應正確解析');
+  });
+
+  test('TC-708 【注入防護】CSV 值中的換行不會偽造額外 vCard 屬性行', function () {
+    var r = CSV.toContacts('姓,備註\r\n王,"safe\nTEL;TYPE=CELL:0900000000"\r\n');
+    var vcard = VCard.build(r.contacts[0]);
+    var lines = vcard.split('\r\n');
+    var forged = 0;
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].indexOf('TEL;TYPE=CELL:0900000000') === 0) forged++;
+    }
+    assertEqual(forged, 0, 'CSV 內嵌換行不應在 vCard 產生額外屬性行');
   });
 
   // =================================================================

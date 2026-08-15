@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<!-- CSP：與主頁一致，只允許本地資源、禁止任何外部連線（NFR-02 離線硬需求）-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; form-action 'none'; base-uri 'none';">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>批次匯入 — vCard QRCode 產生器</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header no-print">
+  <h1 class="app-title">批次匯入 QRCode</h1>
+  <div class="badges">
+    <span class="badge">vCard 3.0</span>
+    <span class="badge badge-offline" title="本程式不會發出任何網路請求">● 離線運作</span>
+    <a class="badge badge-link" href="index.html">← 單張模式</a>
+  </div>
+</header>
+
+<main class="batch-layout">
+
+  <!-- 控制列 -->
+  <section class="batch-controls no-print" aria-labelledby="batch-heading">
+    <h2 id="batch-heading" class="visually-hidden">批次匯入設定</h2>
+
+    <ol class="batch-steps">
+      <li>
+        <span class="step-num">1</span>
+        <div class="step-body">
+          <p class="step-title">下載 CSV 範本，用 Excel 填好聯絡人</p>
+          <p class="step-hint">
+            每一列一位聯絡人，欄位標題沿用單張模式（姓、名、手機、Email…）。
+            在 Excel 填完後請「另存新檔 → CSV UTF-8」。
+          </p>
+          <button type="button" id="download-template" class="btn btn-secondary">下載 CSV 範本</button>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div class="step-body">
+          <p class="step-title">選擇填好的 CSV 檔</p>
+          <input type="file" id="csv-file" accept=".csv,text/csv" class="file-input"
+                 aria-label="選擇 CSV 檔案">
+          <p class="step-hint">容錯等級</p>
+          <div class="segmented" role="radiogroup" aria-label="容錯等級">
+            <button type="button" class="seg" data-ecc="L" role="radio" aria-checked="false">L</button>
+            <button type="button" class="seg is-active" data-ecc="M" role="radio" aria-checked="true">M</button>
+            <button type="button" class="seg" data-ecc="Q" role="radio" aria-checked="false">Q</button>
+            <button type="button" class="seg" data-ecc="H" role="radio" aria-checked="false">H</button>
+          </div>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <div class="step-body">
+          <p class="step-title">產生並列印</p>
+          <div class="batch-actions">
+            <button type="button" id="generate" class="btn btn-primary" disabled>產生 QRCode</button>
+            <button type="button" id="print-sheet" class="btn btn-secondary" disabled>列印 / 存成 PDF</button>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <p id="batch-summary" class="batch-summary" role="status" aria-live="polite"></p>
+    <p id="batch-error" class="batch-error" role="alert" hidden></p>
+  </section>
+
+  <!-- 結果總表 -->
+  <section class="sheet-wrap" aria-labelledby="sheet-heading">
+    <h2 id="sheet-heading" class="visually-hidden">QRCode 總表</h2>
+    <p id="sheet-empty" class="sheet-empty no-print">尚未產生。請先下載範本、填好 CSV 後選檔並按「產生 QRCode」。</p>
+    <div id="sheet-grid" class="sheet-grid"></div>
+  </section>
+
+</main>
+
+<script src="lib/vcard.js"></script>
+<script src="lib/csv.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="batch.js"></script>
+</body>
+</html>

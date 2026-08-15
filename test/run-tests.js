@@ -24,13 +24,16 @@ function loadInto(file) {
 }
 
 loadInto('lib/vcard.js');
+loadInto('lib/csv.js');
 loadInto('vendor/qrcode.js');
 
 var VCard = sandbox.window.VCard;
 var QRCodeLib = sandbox.window.QRCodeLib;
+var CSV = sandbox.window.CSV;
 
 if (!VCard) throw new Error('VCard 未正確載入');
 if (!QRCodeLib) throw new Error('QRCodeLib 未正確載入');
+if (!CSV) throw new Error('CSV 未正確載入');
 
 // ---- 極簡測試框架 ----
 var pass = 0, fail = 0, failures = [];
@@ -92,7 +95,7 @@ defineTestCases({
   assert: assert, assertEqual: assertEqual,
   assertContains: assertContains, assertThrows: assertThrows,
   repeat: repeat,
-  VCard: VCard, QRCodeLib: QRCodeLib
+  VCard: VCard, QRCodeLib: QRCodeLib, CSV: CSV
 });
 
 // ---- 統計 ----
