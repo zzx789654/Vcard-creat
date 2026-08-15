@@ -39,7 +39,6 @@ npm run build:portable   # 只產生免安裝版
 - **即時預覽**：打字的同時右欄 QRCode 就更新，不需要按「產生」按鈕。
 - **vCard 3.0（RFC 2426）**：符合規範的跳脫、折行與結構化欄位，手機通訊錄可正確辨識。
 - **預設欄位齊備**：姓名、手機、公司電話、住家電話、Email、公司、職稱、網站、地址、備註。
-- **自訂欄位**：規格外的資料（LINE ID、社群帳號等）可自行新增，非標準名稱會自動加上 `X-` 前綴以符合規範。
 - **容錯等級可調**：L / M / Q / H，資料量與抗污損程度的取捨。
 - **容量提示**：即時顯示資料佔用的位元組與百分比，接近上限會變色警示。
 - **下載**：QRCode 存成 PNG、名片存成 `.vcf`。
@@ -110,7 +109,7 @@ powershell -ExecutionPolicy Bypass -File test\run-tests.ps1
 |---|---|
 | **離線保證** | Electron 主行程以 `webRequest` 攔截所有非本地請求；CSP 設定 `connect-src 'none'`。即使日後有人不慎加入外部資源也會被擋下。 |
 | **XSS 防護** | 全專案不使用 `innerHTML`／`eval`；使用者輸入一律以 `textContent` 或 `value` 寫入 DOM。 |
-| **vCard 注入防護** | 值中的 CRLF、控制字元會被剝除或跳脫，無法偽造出額外的 vCard 屬性行；自訂欄位鍵名採白名單淨化（只允許 `A-Z0-9-`）。 |
+| **vCard 注入防護** | 值中的 CRLF、控制字元會被剝除或跳脫，無法偽造出額外的 vCard 屬性行。 |
 | **Electron 隔離** | `nodeIntegration:false`、`contextIsolation:true`、`sandbox:true`；preload 不暴露任何 API。 |
 | **檔名安全** | 下載檔名過濾路徑分隔符、控制字元與 Windows 保留裝置名稱。 |
 

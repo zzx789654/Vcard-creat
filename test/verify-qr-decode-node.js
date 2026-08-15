@@ -315,10 +315,9 @@ var vcardFull = VCard.build({
   email: 'ming@example.com', org: '範例科技股份有限公司',
   title: '產品經理', url: 'https://example.com',
   street: '信義路五段 7 號', city: '台北市', region: '信義區',
-  postalCode: '110', country: '台灣', note: '週一至週五 09:00-18:00',
-  custom: [{ key: 'LINE', value: 'ming_line' }]
+  postalCode: '110', country: '台灣', note: '週一至週五 09:00-18:00'
 });
-verify('完整 vCard（含自訂欄位）', vcardFull, 'M');
+verify('完整 vCard', vcardFull, 'M');
 
 var vcardEnglish = VCard.build({
   lastName: 'Wang', firstName: 'Ming', cell: '0912345678',

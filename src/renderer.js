@@ -3,7 +3,7 @@
  *
  * 安全原則（NFR-03）：
  *   使用者輸入一律以 textContent / value 寫入 DOM，全檔不使用 innerHTML，
- *   避免 XSS（CWE-79）。自訂欄位鍵名由 VCard.sanitizeKey 淨化。
+ *   避免 XSS（CWE-79）。
  */
 (function () {
   'use strict';
@@ -24,10 +24,8 @@
   var els = {};
   var state = {
     ecc: 'M',
-    customFields: [],   // [{ id, key, value }]
     lastVCard: '',
-    hasQR: false,
-    customSeq: 0
+    hasQR: false
   };
   var debounceTimer = null;
 
@@ -37,7 +35,6 @@
   function init() {
     cacheElements();
     bindFormEvents();
-    bindCustomFieldEvents();
     bindEccEvents();
     bindDownloadEvents();
     bindUtilityEvents();
@@ -56,9 +53,6 @@
     els.metaBytes     = document.getElementById('meta-bytes');
     els.capacityFill  = document.getElementById('capacity-fill');
     els.capacityText  = document.getElementById('capacity-text');
-    els.customList    = document.getElementById('custom-list');
-    els.customEmpty   = document.getElementById('custom-empty');
-    els.addCustom     = document.getElementById('add-custom');
     els.downloadPng   = document.getElementById('download-png');
     els.downloadVcf   = document.getElementById('download-vcf');
     els.rawVcard      = document.getElementById('raw-vcard');
@@ -73,13 +67,6 @@
     // 避免表單意外送出（本程式無後端）
     els.form.addEventListener('submit', function (e) { e.preventDefault(); });
     els.email.addEventListener('blur', validateEmail);
-  }
-
-  function bindCustomFieldEvents() {
-    els.addCustom.addEventListener('click', function () {
-      addCustomField();
-      scheduleRender();
-    });
   }
 
   function bindEccEvents() {
@@ -108,65 +95,6 @@
   }
 
   // ---------------------------------------------------------------
-  // 自訂欄位
-  // ---------------------------------------------------------------
-  function addCustomField(key, value) {
-    var id = 'cf-' + (++state.customSeq);
-    var entry = { id: id, key: key || '', value: value || '' };
-    state.customFields.push(entry);
-
-    var wrap = document.createElement('div');
-    wrap.className = 'custom-item';
-    wrap.setAttribute('data-id', id);
-
-    var keyInput = document.createElement('input');
-    keyInput.type = 'text';
-    keyInput.className = 'custom-key';
-    keyInput.placeholder = '欄位名稱（如 LINE）';
-    keyInput.value = entry.key;
-    keyInput.setAttribute('aria-label', '自訂欄位名稱');
-    keyInput.addEventListener('input', function () {
-      entry.key = keyInput.value;
-      scheduleRender();
-    });
-
-    var valInput = document.createElement('input');
-    valInput.type = 'text';
-    valInput.className = 'custom-value';
-    valInput.placeholder = '內容';
-    valInput.value = entry.value;
-    valInput.setAttribute('aria-label', '自訂欄位內容');
-    valInput.addEventListener('input', function () {
-      entry.value = valInput.value;
-      scheduleRender();
-    });
-
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn-remove';
-    removeBtn.textContent = '×';
-    removeBtn.title = '移除此欄位';
-    removeBtn.setAttribute('aria-label', '移除此自訂欄位');
-    removeBtn.addEventListener('click', function () {
-      state.customFields = state.customFields.filter(function (f) { return f.id !== id; });
-      wrap.remove();
-      updateCustomEmptyState();
-      render();
-    });
-
-    wrap.appendChild(keyInput);
-    wrap.appendChild(valInput);
-    wrap.appendChild(removeBtn);
-    els.customList.appendChild(wrap);
-    updateCustomEmptyState();
-    keyInput.focus();   // 新增後直接聚焦，減少一次點擊
-  }
-
-  function updateCustomEmptyState() {
-    els.customEmpty.hidden = state.customFields.length > 0;
-  }
-
-  // ---------------------------------------------------------------
   // 資料蒐集與驗證
   // ---------------------------------------------------------------
   function collectData() {
@@ -174,20 +102,13 @@
     FIELD_IDS.forEach(function (id) {
       data[id] = els[id] ? els[id].value : '';
     });
-    data.custom = state.customFields.map(function (f) {
-      return { key: f.key, value: f.value };
-    });
     return data;
   }
 
   /** 判斷是否有任何實質輸入——全空時顯示空狀態而非產生只有骨架的 QR */
   function hasAnyInput(data) {
-    var filled = FIELD_IDS.some(function (id) {
+    return FIELD_IDS.some(function (id) {
       return String(data[id] || '').trim() !== '';
-    });
-    if (filled) return true;
-    return data.custom.some(function (f) {
-      return String(f.key || '').trim() !== '' && String(f.value || '').trim() !== '';
     });
   }
 
@@ -404,12 +325,6 @@
     FIELD_IDS.forEach(function (id) {
       if (els[id]) els[id].value = '';
     });
-    state.customFields = [];
-    // 逐一移除子節點（不用 innerHTML）
-    while (els.customList.firstChild) {
-      els.customList.removeChild(els.customList.firstChild);
-    }
-    updateCustomEmptyState();
     els.emailError.hidden = true;
     els.email.setAttribute('aria-invalid', 'false');
     render();

@@ -165,60 +165,6 @@ function defineTestCases(ctx) {
   });
 
   log('');
-  log('--- TC-400 系列：自訂欄位（FR-04）---');
-
-  test('TC-401 自訂欄位正確輸出並自動加 X- 前綴', function () {
-    var out = VCard.build({ lastName: 'A', custom: [{ key: 'LINE', value: 'my_line_id' }] });
-    assertContains(out, 'X-LINE:my_line_id', '非標準鍵應加 X- 前綴');
-  });
-
-  test('TC-402 已有 X- 前綴時不重複添加', function () {
-    var out = VCard.build({ lastName: 'A', custom: [{ key: 'X-WECHAT', value: 'w1' }] });
-    assertContains(out, 'X-WECHAT:w1');
-    assert(out.indexOf('X-X-WECHAT') === -1, '不應變成 X-X-');
-  });
-
-  test('TC-403 標準屬性名不加前綴', function () {
-    var out = VCard.build({ lastName: 'A', custom: [{ key: 'NICKNAME', value: '阿明' }] });
-    assertContains(out, 'NICKNAME:阿明', '標準鍵不應加前綴');
-  });
-
-  test('TC-404 【注入防護】自訂鍵名含冒號/換行被淨化', function () {
-    var out = VCard.build({ lastName: 'A', custom: [{ key: 'EVIL:X\r\nTEL', value: 'v' }] });
-    var lines = out.split('\r\n');
-    var bad = 0;
-    for (var i = 0; i < lines.length; i++) {
-      if (lines[i].indexOf('TEL:') === 0) bad++;
-    }
-    assertEqual(bad, 0, '淨化後不應產生額外的 TEL 屬性行');
-    assertContains(out, 'X-EVIL-X-TEL:v', '非法字元應轉為連字號');
-  });
-
-  test('TC-405 鍵名或值為空時整條略過', function () {
-    var out = VCard.build({
-      lastName: 'A',
-      custom: [{ key: '', value: 'v' }, { key: 'K', value: '' }, { key: '  ', value: '  ' }]
-    });
-    assert(out.indexOf('X-:') === -1, '空鍵不應輸出');
-    assert(out.indexOf('X-K:') === -1, '空值不應輸出');
-  });
-
-  test('TC-406 sanitizeKey 收斂連續與頭尾連字號', function () {
-    assertEqual(VCard.sanitizeKey('a  b'), 'X-A-B', '空白轉連字號並收斂');
-    assertEqual(VCard.sanitizeKey('!!!'), '', '全為非法字元應回傳空字串');
-  });
-
-  test('TC-407 多個自訂欄位全部輸出', function () {
-    var out = VCard.build({
-      lastName: 'A',
-      custom: [{ key: 'LINE', value: 'l1' }, { key: 'IG', value: 'i1' }, { key: 'SKYPE', value: 's1' }]
-    });
-    assertContains(out, 'X-LINE:l1');
-    assertContains(out, 'X-IG:i1');
-    assertContains(out, 'X-SKYPE:s1');
-  });
-
-  log('');
   log('--- TC-210 系列：FN 必填保證（RFC 2426 相容性）---');
 
   test('TC-211 只填 Email 未填姓名時，FN 以 Email 遞補', function () {
@@ -441,8 +387,7 @@ function defineTestCases(ctx) {
       email: 'ming@example.com', org: '範例科技股份有限公司',
       title: '產品經理', url: 'https://example.com',
       street: '信義路五段 7 號', city: '台北市', region: '信義區',
-      postalCode: '110', country: '台灣', note: '週一至週五 09:00-18:00',
-      custom: [{ key: 'LINE', value: 'ming_line' }]
+      postalCode: '110', country: '台灣', note: '週一至週五 09:00-18:00'
     });
     var qr = QRCodeLib.make(vcard, 'M');
     assert(qr.version <= 40, '應在版本 40 內容納');

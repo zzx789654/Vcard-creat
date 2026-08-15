@@ -136,7 +136,6 @@
    * @param {string} data.postalCode 郵遞區號
    * @param {string} data.country    國家
    * @param {string} data.note       備註
-   * @param {Array<{key:string, value:string}>} data.custom 自訂欄位
    * @returns {string} vCard 3.0 字串（以 CRLF 分行）
    */
   function build(data) {
@@ -204,40 +203,8 @@
     var noteLine = makeLine('NOTE', data.note);
     if (noteLine) lines.push(noteLine);
 
-    // 自訂欄位：鍵名淨化後輸出；非標準鍵自動加 X- 前綴（RFC 2426 §3.8 擴充機制）
-    if (isArray(data.custom)) {
-      data.custom.forEach(function (f) {
-        if (!f || isBlank(f.key) || isBlank(f.value)) return;
-        var key = sanitizeKey(f.key);
-        if (!key) return;
-        var l = makeLine(key, f.value);
-        if (l) lines.push(l);
-      });
-    }
-
     lines.push('END:VCARD');
     return lines.join(CRLF) + CRLF;
-  }
-
-  // vCard 3.0 已知的標準屬性名（自訂欄位若用這些名稱就不加 X- 前綴）
-  var STANDARD_KEYS = [
-    'NICKNAME', 'BDAY', 'ANNIVERSARY', 'GENDER', 'CATEGORIES', 'ROLE',
-    'TEL', 'EMAIL', 'URL', 'NOTE', 'ORG', 'TITLE', 'ADR', 'GEO', 'TZ', 'LANG'
-  ];
-
-  /**
-   * 淨化自訂欄位鍵名：只允許英數與連字號（RFC 2426 屬性名規則），
-   * 避免使用者輸入 `:`、換行等字元破壞 vCard 結構（注入防護）。
-   */
-  function sanitizeKey(rawKey) {
-    var key = trim(rawKey).toUpperCase()
-      .replace(/[^A-Z0-9-]/g, '-')   // 非法字元一律轉為連字號
-      .replace(/-+/g, '-')            // 收斂連續連字號
-      .replace(/^-+|-+$/g, '');       // 去除頭尾連字號
-    if (!key) return '';
-    if (key.indexOf('X-') === 0) return key;
-    if (STANDARD_KEYS.indexOf(key) !== -1) return key;
-    return 'X-' + key;
   }
 
   // Windows 保留裝置名稱：直接拿來當檔名會存檔失敗
@@ -271,7 +238,6 @@
     build: build,
     escapeValue: escapeValue,
     foldLine: foldLine,
-    sanitizeKey: sanitizeKey,
     safeFileName: safeFileName,
     utf8Len: utf8Len
   };

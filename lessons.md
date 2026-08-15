@@ -102,6 +102,14 @@
 - 準則：資安 Exit Criteria 的對象是**出貨的產品程式碼**。SAST job 明確 `--exclude=test --exclude=src/vendor`，
   只掃 `src main.js preload.js`。範圍對齊語意，gate 才不會被非出貨碼的雜訊擋住而失去意義。
 
+**14. 移除功能要「連根拔」——UI、邏輯、產生器、測試、文件、匯出一起清**
+- 情境：依需求移除「自訂欄位」功能。
+- 準則：一個功能的足跡橫跨多層，只刪 UI 會留下死碼與失敗測試。系統化清點（grep 關鍵字）後，
+  一次移除：index.html 區塊、renderer 的 state/事件/函式、vcard.js 的 build 分支與 `sanitizeKey`/`STANDARD_KEYS`
+  及其模組匯出、styles.css 專屬樣式（含只此處用到的 `.btn-remove`/`.empty-note`/`.group-hint`）、
+  相關測試（TC-400 系列 7 條 + 整合案例中的 custom）、以及文件（README/CoreMain/SRS/待修改）。
+  移除後跑 `node --check` + 全測試確認無殘留參照與死碼。移除也縮小了攻擊面（少了一條使用者可控的 vCard 屬性注入路徑）。
+
 **13. 未簽章桌面 app 的 Windows 告警是「發佈信任」問題，不是程式問題**
 - 情境：electron-builder 產出的安裝檔在 Windows 首次執行跳 SmartScreen「Windows 已保護您的電腦」。
 - 準則：這是**未做受信任程式碼簽章**造成，與程式安全無關。唯一能真正消除的方法是用受信任憑證簽章

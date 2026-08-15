@@ -148,20 +148,6 @@ body {
   letter-spacing: .02em;
 }
 
-.group-hint {
-  margin: 0 0 10px;
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-
-.group-hint code {
-  font-family: var(--mono);
-  background: var(--surface-2);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
 .row { display: grid; gap: 10px; }
 .row-2 { grid-template-columns: 1fr 1fr; }
 .row-3 { grid-template-columns: 1fr 1fr 1fr; }
@@ -222,43 +208,6 @@ input[aria-invalid="true"] { border-color: var(--danger); }
   margin: 5px 0 0;
   font-size: 12.5px;
   color: var(--danger);
-}
-
-/* ---------- 自訂欄位 ---------- */
-.custom-list { display: flex; flex-direction: column; gap: 8px; }
-
-.custom-item {
-  display: grid;
-  grid-template-columns: minmax(90px, .8fr) 1.4fr auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.custom-item input { min-height: 40px; }
-
-.btn-remove {
-  min-width: 44px;
-  min-height: 44px;          /* 觸控目標 ≥44px（WCAG 2.5.5）*/
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--danger);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background .12s, border-color .12s;
-}
-
-.btn-remove:hover {
-  background: var(--danger-soft);
-  border-color: var(--danger);
-}
-
-.empty-note {
-  margin: 4px 0 10px;
-  font-size: 12.5px;
-  color: var(--text-muted);
-  font-style: italic;
 }
 
 /* ---------- 按鈕 ---------- */
@@ -509,7 +458,6 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 
 @media (max-width: 560px) {
   .row-2, .row-3 { grid-template-columns: 1fr; }
-  .custom-item { grid-template-columns: 1fr 1fr auto; }
   .app-header { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 
