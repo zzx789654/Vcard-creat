@@ -23,15 +23,19 @@
     "files": [
       "main.js",
       "preload.js",
-      "src/**/*"
+      "src/**/*",
+      "assets/icon.png"
     ],
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "nsis": {
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }

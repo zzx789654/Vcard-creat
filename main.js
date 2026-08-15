@@ -24,6 +24,7 @@ function createWindow() {
     minHeight: 600,
     title: 'vCard QRCode 產生器',
     backgroundColor: '#f4f6f9',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
