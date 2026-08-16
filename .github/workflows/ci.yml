@@ -76,10 +76,11 @@ jobs:
             src main.js preload.js
 
   # 維度：資安 —— SAST 引擎 ②（CodeQL，與 Semgrep 雙引擎交叉驗證）
+  # 多語言全專案掃描：JavaScript/TypeScript + Python（scripts）+ GitHub Actions。
   # 私有 repo 未啟用 GitHub Advanced Security，故不上傳 code scanning，
-  # 改以 upload:false 產出 SARIF、自行解析，有任何發現即擋 build。
+  # 改以 upload:false 產出 SARIF（每語言一份）、自行解析，有任何發現即擋 build。
   codeql:
-    name: 資安 — 靜態分析 SAST②（CodeQL）
+    name: 資安 — 靜態分析 SAST②（CodeQL 全專案）
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -87,28 +88,37 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@v4
-      - name: CodeQL 初始化（JavaScript/TypeScript）
+      - name: CodeQL 初始化（JS/TS + Python + Actions）
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript-typescript
+          languages: javascript-typescript,python,actions
           config-file: ./.github/codeql/codeql-config.yml
       - name: CodeQL 分析（本地產出 SARIF，不上傳）
         uses: github/codeql-action/analyze@v3
         with:
           upload: false
           output: codeql-out
-      - name: 依 CodeQL 發現決定是否擋 build
+      - name: 依 CodeQL 發現決定是否擋 build（彙總各語言 SARIF）
+        shell: bash
         run: |
-          sarif=$(ls codeql-out/*.sarif 2>/dev/null | head -1)
-          if [ -z "$sarif" ]; then echo "找不到 CodeQL SARIF 輸出"; exit 1; fi
-          n=$(python3 -c "import json,sys; d=json.load(open('$sarif')); print(sum(len(r.get('results',[])) for r in d.get('runs',[])))")
-          echo "CodeQL 發現數：$n"
-          if [ "$n" -gt 0 ]; then
-            echo "::error::CodeQL 偵測到 $n 項問題"
-            python3 -c "import json; d=json.load(open('$sarif')); [print('-', x.get('ruleId'), '::', x.get('message',{}).get('text','')) for r in d.get('runs',[]) for x in r.get('results',[])]"
+          shopt -s nullglob
+          files=(codeql-out/*.sarif)
+          if [ ${#files[@]} -eq 0 ]; then echo "找不到 CodeQL SARIF 輸出"; exit 1; fi
+          total=0
+          for sarif in "${files[@]}"; do
+            n=$(python3 -c "import json; d=json.load(open('$sarif')); print(sum(len(r.get('results',[])) for r in d.get('runs',[])))")
+            echo "  $(basename "$sarif")：$n 發現"
+            total=$((total + n))
+          done
+          echo "CodeQL 總發現數：$total"
+          if [ "$total" -gt 0 ]; then
+            echo "::error::CodeQL 偵測到 $total 項問題"
+            for sarif in "${files[@]}"; do
+              python3 -c "import json; d=json.load(open('$sarif')); [print('-', x.get('ruleId'), '::', x.get('message',{}).get('text','')) for r in d.get('runs',[]) for x in r.get('results',[])]"
+            done
             exit 1
           fi
-          echo "CodeQL：無發現。"
+          echo "CodeQL：全語言皆無發現。"
 
   # 維度：資安 —— SCA 來源 ②（Google OSV-Scanner，與 npm audit 交叉驗證）
   # 以 OSV.dev 資料庫掃 lockfile；偵測到弱點即非零退出、擋 build。

@@ -154,7 +154,7 @@ powershell -ExecutionPolicy Bypass -File test\run-tests.ps1
 | 類別 | 工具 | 說明 |
 |---|---|---|
 | SAST ① | **Semgrep**（OWASP Top 10） | 僅掃產品碼（排除 test/vendor） |
-| SAST ② | **CodeQL**（JavaScript/TypeScript） | 第二引擎交叉驗證；私有 repo 未啟用 GHAS，故本地產出 SARIF 自行判定、不上傳 code scanning |
+| SAST ② | **CodeQL**（JS/TS + Python + GitHub Actions，全專案） | 第二引擎交叉驗證，多語言掃描（只排除第三方 vendor）；私有 repo 未啟用 GHAS，故本地產出各語言 SARIF 自行判定、不上傳 code scanning。HTML/CSS/PowerShell 非 CodeQL 支援語言，由 CSP／人工審查涵蓋 |
 | SCA ① | **npm audit**（GitHub Advisory DB） | high 以上擋 build |
 | SCA ② | **OSV-Scanner**（Google，OSV.dev DB） | 第二來源交叉驗證，掃 `package-lock.json` |
 | 密鑰 | **Gitleaks** | 掃整個工作區 |
