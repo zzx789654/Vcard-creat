@@ -1,0 +1,8 @@
+name: "vCard CodeQL config"
+
+# 只分析出貨的產品程式碼；排除測試（含測試用 eval）與第三方內嵌碼，
+# 與 Semgrep（SAST）的掃描範圍一致，讓兩引擎對齊同一份「出貨程式」。
+paths-ignore:
+  - test
+  - src/vendor
+  - scripts

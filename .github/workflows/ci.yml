@@ -58,11 +58,11 @@ jobs:
       - name: Gitleaks（掃描工作區檔案，命中即擋 build）
         run: gitleaks dir . --no-banner --redact --exit-code=1
 
-  # 維度：資安 —— SAST（Critical/High 擋 build）
+  # 維度：資安 —— SAST 引擎 ①（Semgrep，Critical/High 擋 build）
   # 只掃「出貨的產品程式碼」：排除 test/（非出貨、含測試用 eval）與
   # src/vendor/（第三方 MIT 內嵌碼），對齊資安 Exit Criteria 的範圍。
   sast:
-    name: 資安 — 靜態分析（SAST）
+    name: 資安 — 靜態分析 SAST①（Semgrep）
     runs-on: ubuntu-latest
     container:
       image: semgrep/semgrep
@@ -75,10 +75,65 @@ jobs:
             --exclude=test --exclude=src/vendor --exclude=node_modules \
             src main.js preload.js
 
-  # 全部 gate 綠燈 = 過 G5
-  gate-g5:
-    name: Gate G5 — 三維度 Exit Criteria 全數達標
-    needs: [test, sca, secret-scan, sast]
+  # 維度：資安 —— SAST 引擎 ②（CodeQL，與 Semgrep 雙引擎交叉驗證）
+  # 私有 repo 未啟用 GitHub Advanced Security，故不上傳 code scanning，
+  # 改以 upload:false 產出 SARIF、自行解析，有任何發現即擋 build。
+  codeql:
+    name: 資安 — 靜態分析 SAST②（CodeQL）
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: CodeQL 初始化（JavaScript/TypeScript）
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          config-file: ./.github/codeql/codeql-config.yml
+      - name: CodeQL 分析（本地產出 SARIF，不上傳）
+        uses: github/codeql-action/analyze@v3
+        with:
+          upload: false
+          output: codeql-out
+      - name: 依 CodeQL 發現決定是否擋 build
+        run: |
+          sarif=$(ls codeql-out/*.sarif 2>/dev/null | head -1)
+          if [ -z "$sarif" ]; then echo "找不到 CodeQL SARIF 輸出"; exit 1; fi
+          n=$(python3 -c "import json,sys; d=json.load(open('$sarif')); print(sum(len(r.get('results',[])) for r in d.get('runs',[])))")
+          echo "CodeQL 發現數：$n"
+          if [ "$n" -gt 0 ]; then
+            echo "::error::CodeQL 偵測到 $n 項問題"
+            python3 -c "import json; d=json.load(open('$sarif')); [print('-', x.get('ruleId'), '::', x.get('message',{}).get('text','')) for r in d.get('runs',[]) for x in r.get('results',[])]"
+            exit 1
+          fi
+          echo "CodeQL：無發現。"
+
+  # 維度：資安 —— SCA 來源 ②（Google OSV-Scanner，與 npm audit 交叉驗證）
+  # 以 OSV.dev 資料庫掃 lockfile；偵測到弱點即非零退出、擋 build。
+  osv:
+    name: 資安 — 相依套件掃描 SCA②（OSV-Scanner）
     runs-on: ubuntu-latest
     steps:
-      - run: echo "✅ G5 通過：功能/品質/資安三維度 CI gate 全數綠燈。"
+      - uses: actions/checkout@v4
+      - name: 下載 OSV-Scanner（Google）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          url=$(curl -sSfL -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/google/osv-scanner/releases/latest \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if 'linux_amd64' in a['name'] and a['name'].startswith('osv-scanner_')))")
+          echo "下載：$url"
+          curl -sSfL "$url" -o osv-scanner
+          chmod +x osv-scanner
+      - name: OSV-Scanner（掃 lockfile，偵測到弱點即擋 build）
+        run: ./osv-scanner --lockfile=package-lock.json
+
+  # 全部 gate 綠燈 = 過 G5（SAST 雙引擎、SCA 雙來源皆需通過）
+  gate-g5:
+    name: Gate G5 — 三維度 Exit Criteria 全數達標
+    needs: [test, sca, osv, secret-scan, sast, codeql]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ G5 通過：功能/品質/資安三維度 CI gate 全數綠燈（SAST 雙引擎、SCA 雙來源）。"

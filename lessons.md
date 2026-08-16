@@ -108,6 +108,18 @@
   確認後才動工，並**同步更新 CoreMain/SRS/README** 讓北極星與實作一致。本輪定調＝獨立批次模式（不動單張）、
   CSV（守住零執行期相依）、可列印總表。
 
+**17. 加第二資安引擎要處理各自的環境限制，不能照抄範本**
+- 情境：在 Semgrep + npm audit 之外，再加 CodeQL（SAST②）與 OSV-Scanner（SCA②）做交叉驗證。
+- 準則：
+  - **CodeQL 於私有 repo**：上傳 code scanning 需 GitHub Advanced Security（GHAS）。未啟用時用
+    `analyze` 的 `upload:false` + `output:` 產出 SARIF，再自行解析、有發現即 `exit 1`——CodeQL 引擎本身
+    不需 GHAS，只有「上傳到 code scanning UI」才需要。範圍用 `config-file` 對齊 Semgrep（排除 test/vendor）。
+  - **OSV-Scanner 需連 OSV.dev**：本機被 egress proxy 擋（api.osv.dev 403）時它仍 exit 0、印 0 弱點——
+    是「查不到」不是「沒弱點」，別誤判。真正的掃描在 GitHub runner（可連外）才會發生。取二進位用
+    GitHub API 動態解析最新 linux_amd64 資產名，避免猜錯資產名。
+  - **驗證要足但認清界線**：本機能驗「叫用機制」（osv-scanner 正確解析 269 個套件），但拿不到「真實弱點結果」
+    （proxy 擋 DB）；真實結果以 CI runner 為準，推後緊盯該次 run。
+
 **16. 守住專案 DNA：用「自寫小解析器」換掉「大型第三方庫」**
 - 情境：「Excel 匯入」直覺會想內嵌 SheetJS 讀 .xlsx，但那是上百 KB 的第三方相依，破壞本專案「零執行期相依、完全離線」的 DNA。
 - 準則：先問「使用者真正要的是什麼」——是「大量匯入清單」，不是「一定要 .xlsx」。改用 CSV：自寫 ~150 行解析器

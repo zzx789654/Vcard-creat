@@ -146,8 +146,18 @@ powershell -ExecutionPolicy Bypass -File test\run-tests.ps1
 
 | Workflow | 觸發 | 內容 |
 |---|---|---|
-| **`ci.yml`（G5）** | push / PR | 功能+品質：`npm test` + `npm run verify` + 語法檢查；資安：`npm audit`（SCA）、Gitleaks（密鑰）、Semgrep（SAST，僅掃產品碼）。任一未達標即擋 build。 |
+| **`ci.yml`（G5）** | push / PR | 功能+品質：`npm test` + `npm run verify` + 語法檢查；資安（見下方雙引擎/雙來源）。任一未達標即擋 build。 |
 | **`release.yml`（G6）** | 推送 `v*` tag | 打包前重跑測試 → 於 Windows runner 以 electron-builder 產出 NSIS 安裝檔與 portable 版 → 發佈 GitHub Release。 |
+
+資安關卡採**雙引擎／雙來源交叉驗證**，任一命中即擋 build：
+
+| 類別 | 工具 | 說明 |
+|---|---|---|
+| SAST ① | **Semgrep**（OWASP Top 10） | 僅掃產品碼（排除 test/vendor） |
+| SAST ② | **CodeQL**（JavaScript/TypeScript） | 第二引擎交叉驗證；私有 repo 未啟用 GHAS，故本地產出 SARIF 自行判定、不上傳 code scanning |
+| SCA ① | **npm audit**（GitHub Advisory DB） | high 以上擋 build |
+| SCA ② | **OSV-Scanner**（Google，OSV.dev DB） | 第二來源交叉驗證，掃 `package-lock.json` |
+| 密鑰 | **Gitleaks** | 掃整個工作區 |
 
 發佈新版本：
 
