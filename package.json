@@ -1,6 +1,6 @@
 {
   "name": "vcard-qrcode-generator",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "完全離線的 vCard 3.0 QRCode 產生器：左側輸入聯絡資料，右側即時預覽 QRCode",
   "main": "main.js",
   "private": true,
