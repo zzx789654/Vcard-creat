@@ -156,13 +156,13 @@ powershell -ExecutionPolicy Bypass -File test\run-tests.ps1
 | SAST ① | **Semgrep**（OWASP Top 10） | 僅掃產品碼（排除 test/vendor） |
 | SAST ② | **CodeQL**（JS/TS + Python + GitHub Actions，全專案） | 第二引擎交叉驗證，多語言掃描（只排除第三方 vendor）；私有 repo 未啟用 GHAS，故本地產出各語言 SARIF 自行判定、不上傳 code scanning。HTML/CSS/PowerShell 非 CodeQL 支援語言，由 CSP／人工審查涵蓋 |
 | SCA ① | **npm audit**（GitHub Advisory DB） | high 以上擋 build |
-| SCA ② | **OSV-Scanner**（Google，OSV.dev DB） | 第二來源交叉驗證，掃 `package-lock.json` |
+| SCA ② | **OSV.dev**（Google，`scripts/osv-check.py`） | 第二來源交叉驗證，直接查詢 OSV.dev API 掃 `package-lock.json`；不下載、不執行外部二進位 |
 | 密鑰 | **Gitleaks** | 掃整個工作區 |
 
 發佈新版本：
 
 ```bash
-git tag v1.0.0 && git push origin v1.0.0
+git tag v1.2.1 && git push origin v1.2.1
 ```
 
 ---
@@ -188,10 +188,15 @@ powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1
 
 # 步驟二（每次下載新安裝檔後執行）：簽章該安裝檔並移除「網路來源」標記
 powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1 `
-  -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.0.0.exe"
+  -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.2.1.exe"
 ```
 
 完成後在**你信任過的這台電腦**上執行就不會再跳告警。
+
+> **憑證安全**：腳本產生的私鑰設為**不可匯出**、效期 **1 年**，降低私鑰被盜用來簽其他程式的風險。
+> 若你曾用舊版腳本產生過憑證（私鑰可匯出、效期 5 年），建議先在 `certmgr.msc` 的
+> 「個人」「受信任的根憑證授權單位」「受信任的發行者」三處刪除同名憑證，再重新執行腳本。
+> 不再需要時，同樣從這三處刪除即可取消信任。
 
 > **範圍限制（誠實說明）**：自簽憑證只在「你手動信任過的機器」上有效。
 > 要對**外部使用者**散佈且完全消除告警，需購買 EV／OV 商業程式碼簽章憑證

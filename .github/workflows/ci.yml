@@ -25,7 +25,7 @@ jobs:
         run: |
           find src main.js preload.js -name "*.js" -print0 \
             | xargs -0 -I{} node --check {}
-      - name: 單元測試（60 條，通過率須 100%）
+      - name: 單元測試（通過率須 100%）
         run: npm test
       - name: QR 反解端到端驗證（7 條，證明可被掃描器讀回）
         run: npm run verify
@@ -120,25 +120,16 @@ jobs:
           fi
           echo "CodeQL：全語言皆無發現。"
 
-  # 維度：資安 —— SCA 來源 ②（Google OSV-Scanner，與 npm audit 交叉驗證）
-  # 以 OSV.dev 資料庫掃 lockfile；偵測到弱點即非零退出、擋 build。
+  # 維度：資安 —— SCA 來源 ②（Google OSV.dev，與 npm audit 交叉驗證）
+  # 以 scripts/osv-check.py 直接查詢 OSV.dev API（只用 Python 標準函式庫），
+  # 不下載、不執行任何外部二進位；偵測到弱點或查詢失敗即非零退出、擋 build。
   osv:
-    name: 資安 — 相依套件掃描 SCA②（OSV-Scanner）
+    name: 資安 — 相依套件掃描 SCA②（OSV.dev）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 下載 OSV-Scanner（Google）
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          url=$(curl -sSfL -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/google/osv-scanner/releases/latest \
-            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if 'linux_amd64' in a['name'] and a['name'].startswith('osv-scanner_')))")
-          echo "下載：$url"
-          curl -sSfL "$url" -o osv-scanner
-          chmod +x osv-scanner
-      - name: OSV-Scanner（掃 lockfile，偵測到弱點即擋 build）
-        run: ./osv-scanner --lockfile=package-lock.json
+      - name: OSV.dev（掃 lockfile，偵測到弱點即擋 build）
+        run: python3 scripts/osv-check.py package-lock.json
 
   # 全部 gate 綠燈 = 過 G5（SAST 雙引擎、SCA 雙來源皆需通過）
   gate-g5:

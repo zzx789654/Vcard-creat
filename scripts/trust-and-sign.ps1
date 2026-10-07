@@ -13,6 +13,11 @@
     3. If an installer path is given, signs it with Set-AuthenticodeSignature
        and strips the downloaded "Mark of the Web" so it runs without warning.
 
+  Security: the private key is created NON-exportable and the certificate
+  expires after 1 year, limiting what a stolen or misused key can sign.
+  To stop trusting it, delete it from certmgr.msc (Current User > Personal,
+  Trusted Root Certification Authorities, Trusted Publishers).
+
   NOTE (ASCII-only comments and messages on purpose): Windows PowerShell 5.1
   reads .ps1 as ANSI; non-ASCII in comments can swallow following code lines.
   Chinese walkthrough lives in README.md instead.
@@ -23,7 +28,7 @@
 
     # Sign a downloaded installer (run after each new download)
     powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1 `
-      -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.0.0.exe"
+      -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.2.1.exe"
 #>
 
 param(
@@ -58,8 +63,8 @@ function Get-OrCreateCert {
     -FriendlyName $Subject `
     -CertStoreLocation Cert:\CurrentUser\My `
     -KeyUsage DigitalSignature `
-    -KeyExportPolicy Exportable `
-    -NotAfter (Get-Date).AddYears(5)
+    -KeyExportPolicy NonExportable `
+    -NotAfter (Get-Date).AddYears(1)
 }
 
 function Trust-Cert {

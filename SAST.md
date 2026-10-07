@@ -31,11 +31,11 @@
 |---|---|---|---|---|---|---|
 | FIND-001 | **High** | `package.json` electron `^43.4.0`（鎖 43.4.0） | CWE-1395／A03 | **出貨執行期**的 Electron 有 4 則 High：GHSA-gr2m-v5gq-v685、GHSA-j84w-jfhq-vhvj、GHSA-9qh4-3jw8-366w、GHSA-qmv3-fv6v-rmhq。本程式已關 webview、拒絕開新視窗、開 sandbox、CSP `connect-src 'none'`，實際可利用性低，但仍屬已知漏洞版本 | 升級至 43.4.1 以上（同 major 最新 43.7.8） | ✅ 已修補（見回歸） |
 | FIND-002 | Medium（工具報 High） | `package-lock.json` 建置工具鏈遞移相依：@xmldom/xmldom、brace-expansion、fast-uri、undici、js-yaml、http-cache-semantics（High）；sprintf-js、global-agent、roarr 等（Moderate） | CWE-1395／A03 | 只在 electron-builder 打包時使用，**不進安裝檔**，故下調一級。但 CI 的 `npm audit --audit-level=high` 會因此**轉紅**，G5 失守 | `npm audit fix`（不加 `--force`，不降級 electron-builder） | ✅ 已修補（見回歸） |
-| FIND-003 | Medium | `.github/workflows/ci.yml:129-142` | CWE-494／A08 | 從 GitHub Release 下載 osv-scanner 二進位後**未驗 SHA256** 即執行；若下載來源或傳輸被竄改，會在 CI runner 執行任意程式 | 固定版本號，並以官方 `osv-scanner_SHA256SUMS` 驗 checksum；或改用官方 `google/osv-scanner-action`（以 commit SHA 釘選） | 待修補 |
-| FIND-004 | Medium | `scripts/trust-and-sign.ps1:54-62、70` | CWE-321／A04 | 自簽碼簽憑證的私鑰設成 `-KeyExportPolicy Exportable` 且有效 5 年，憑證又被加入 CurrentUser 的 Root＋TrustedPublisher。同使用者權限的惡意程式可以匯出或直接使用該私鑰，簽出本機會信任的程式 | 改 `NonExportable`；效期縮短（例如 1 年）；文件提醒「只在自己電腦用、用完可從 Root 移除」 | 待修補 |
-| FIND-005 | Low | `ci.yml`、`release.yml` 共 15 處 `uses: …@v4`；容器 `gitleaks:latest`、`semgrep/semgrep` | CWE-829／A03 | Action 與容器以可變 tag 參照，上游被入侵時會自動帶進 CI。`release.yml` 擁有 `contents: write` 權限，影響較大 | 以完整 commit SHA 釘選（註解標版本），容器用 digest | 待修補 |
-| FIND-006 | Low | `main.js:47-58`（`will-navigate`） | CWE-284／A01 | 只要是 `file:` 就允許導覽，未限制在 `src/` 底下。目前沒有 XSS 入口（CSP＋全程 textContent），屬縱深防禦缺口 | 解析路徑後確認位於 `APP_ROOT` 內才放行 | 待修補 |
-| FIND-007 | Low | `src/batch.js:76-93` | CWE-400／A06 | CSV 整份讀入並解析後才截到 500 列，未限制檔案大小；選到超大檔會讓視窗卡死（僅影響本機自身） | 讀檔前檢查 `file.size`（例如 > 5 MB 即拒絕並提示） | 待修補 |
+| FIND-003 | Medium | `.github/workflows/ci.yml:129-142` | CWE-494／A08 | 從 GitHub Release 下載 osv-scanner 二進位後**未驗 SHA256** 即執行；若下載來源或傳輸被竄改，會在 CI runner 執行任意程式 | 固定版本號，並以官方 `osv-scanner_SHA256SUMS` 驗 checksum；或改用官方 `google/osv-scanner-action`（以 commit SHA 釘選） | ✅ 已修補（回歸②） |
+| FIND-004 | Medium | `scripts/trust-and-sign.ps1:54-62、70` | CWE-321／A04 | 自簽碼簽憑證的私鑰設成 `-KeyExportPolicy Exportable` 且有效 5 年，憑證又被加入 CurrentUser 的 Root＋TrustedPublisher。同使用者權限的惡意程式可以匯出或直接使用該私鑰，簽出本機會信任的程式 | 改 `NonExportable`；效期縮短（例如 1 年）；文件提醒「只在自己電腦用、用完可從 Root 移除」 | ✅ 已修補（回歸②） |
+| FIND-005 | Low | `ci.yml`、`release.yml` 共 15 處 `uses: …@v4`；容器 `gitleaks:latest`、`semgrep/semgrep` | CWE-829／A03 | Action 與容器以可變 tag 參照，上游被入侵時會自動帶進 CI。`release.yml` 擁有 `contents: write` 權限，影響較大 | 以完整 commit SHA 釘選（註解標版本），容器用 digest | ⏸ 保留（需查第三方 repo 的 commit SHA，超出本 session 權限） |
+| FIND-006 | Low | `main.js:47-58`（`will-navigate`） | CWE-284／A01 | 只要是 `file:` 就允許導覽，未限制在 `src/` 底下。目前沒有 XSS 入口（CSP＋全程 textContent），屬縱深防禦缺口 | 解析路徑後確認位於 `APP_ROOT` 內才放行 | ✅ 已修補（回歸②） |
+| FIND-007 | Low | `src/batch.js:76-93` | CWE-400／A06 | CSV 整份讀入並解析後才截到 500 列，未限制檔案大小；選到超大檔會讓視窗卡死（僅影響本機自身） | 讀檔前檢查 `file.size`（例如 > 5 MB 即拒絕並提示） | ✅ 已修補（回歸②） |
 
 **誤報（不開單）**
 - Semgrep `gha-curl-pipe-shell`（`ci.yml:134`）：`curl … | python3 -c` 是把 JSON 交給 Python 解析取下載網址，**不是把下載內容當 shell 執行**。真正的風險是下載後未驗證，已由 FIND-003 涵蓋。
@@ -61,7 +61,18 @@
 - 相依套件：出貨執行期 High 1（Electron）；建置期 High 6 個套件、Moderate 8
 - OWASP 覆蓋：10／10 類已審（A07 不適用）
 
-### 回歸掃描（2026-10-07，修補 FIND-001／002 後）
+### 回歸掃描②（2026-10-07，修補 FIND-003／004／006／007，v1.2.1）
+- FIND-003：`ci.yml` 的 osv job 改為執行 `scripts/osv-check.py`，用 Python 標準函式庫直接查 OSV.dev API，**不再下載、執行外部二進位**；
+  查詢失敗也 exit 1（fail-closed）。以已知有漏洞的 `sprintf-js@1.1.3` 做反向測試，確認會 exit 1。
+  首版用 `urllib.request.urlopen` 被 Bandit B310 標出（可接受非 https 協定），改用只支援 HTTPS 的 `http.client.HTTPSConnection`，未加抑制註解。
+- FIND-004：`trust-and-sign.ps1` 改 `-KeyExportPolicy NonExportable`、效期 1 年；README 補充舊憑證的移除方式。
+- FIND-006：`main.js` 新增 `isInsideAppRoot()`，`will-navigate` 只放行 `src/` 底下的 `file:` 頁面。
+  實測：`src/index.html`、`src/batch.html?x#y` 放行；`/etc/passwd`、`src/../main.js`、`srcevil/a.html`、https、無效 URL、`src` 目錄本身皆擋下。
+- FIND-007：`batch.js` 讀檔前檢查 `file.size > 5 MB` 即拒絕。Playwright 實測：5.6 MB 檔顯示錯誤且「產生」鈕停用；正常小檔可產生。
+- 結果：Semgrep 15（全為 FIND-005）、`gha-curl-pipe-shell` 消失；Bandit 0；npm audit 0；OSV 0；`npm test` 61／61；`npm run verify` 7／7。
+- 剩餘：FIND-005（Low）。釘選 Action 需查 actions/checkout 等第三方 repo 的 commit SHA，本 session 的 GitHub 權限僅限本 repo，留待手動處理或用 Dependabot 自動釘選。
+
+### 回歸掃描①（2026-10-07，修補 FIND-001／002 後）
 - 觸發：CI run #23 的 `npm audit`（SCA①）與 OSV-Scanner（SCA②）兩個 job 失敗，原因即 FIND-001／002。
 - 修補：
   - `electron` `^43.4.0` → `^43.7.8`、`electron-builder` `^26.15.3` → `^26.17.0`，並執行 `npm audit fix`（未加 `--force`）。

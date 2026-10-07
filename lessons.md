@@ -176,3 +176,8 @@
 - 情境：`ci.yml` 用 curl 下載 osv-scanner 後直接執行；所有 Action 以 `@v4` 這種可變 tag 參照。
 - 準則：從網路取得的執行檔一律固定版本＋驗 SHA256；第三方 Action 以完整 commit SHA 釘選、容器以 digest 釘選；
   具 `contents: write` 權限的 workflow（release）優先處理。
+  能用 API 直接查的就別下載二進位：OSV.dev 有公開 API，用標準函式庫查詢即可，連 checksum 都不必管。
+
+**20. 掃描工具標出的問題要改寫法，不要加抑制註解**
+- 情境：新寫的 `osv-check.py` 用 `urllib.request.urlopen`，Bandit B310 警告它可接受 `file:` 等協定。網址明明是常數，很想加 `# nosec`。
+- 準則：換成語意上就只能做安全事情的 API（`http.client.HTTPSConnection` 只走 HTTPS），警告自然消失，日後改動也不會失去保護。

@@ -11,6 +11,7 @@
   var QR_PIXEL_SIZE = 340;   // 每張 QR 的 canvas 內部解析度（列印才夠清晰）
   var QUIET_ZONE = 4;
   var MAX_ROWS = 500;        // 單次批次上限，避免一次算太多造成卡頓
+  var MAX_FILE_BYTES = 5 * 1024 * 1024;  // 5 MB：500 列名片遠小於此，超過即拒絕，避免整份讀入卡死視窗
 
   var els = {};
   var state = { ecc: 'M', csvText: '', fileName: '' };
@@ -77,6 +78,12 @@
     hideError();
     var file = els.csvFile.files && els.csvFile.files[0];
     if (!file) { els.generate.disabled = true; return; }
+    if (file.size > MAX_FILE_BYTES) {
+      state.csvText = '';
+      els.generate.disabled = true;
+      showError('檔案超過 5 MB，請分成較小的 CSV 再匯入（單次最多 ' + MAX_ROWS + ' 筆）。');
+      return;
+    }
 
     var reader = new FileReader();
     reader.onload = function () {

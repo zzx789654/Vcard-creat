@@ -12,9 +12,22 @@
 
 const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
+const { fileURLToPath } = require('url');
 
 /** 允許載入的本地檔案根目錄 */
 const APP_ROOT = path.join(__dirname, 'src');
+
+/** url 是否為 APP_ROOT 底下的 file:// 位址 */
+function isInsideAppRoot(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'file:') return false;
+    const rel = path.relative(APP_ROOT, fileURLToPath(parsed));
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  } catch (e) {
+    return false;
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -42,16 +55,10 @@ function createWindow() {
 
   win.loadFile(path.join(APP_ROOT, 'index.html'));
 
-  // 禁止在應用程式視窗內導覽到任何外部位址。
-  // 解析失敗一律視為不安全（fail-closed），避免畸形 URL 造成主行程例外。
+  // 只允許在 src/ 底下的本地頁面之間導覽（index.html ↔ batch.html）。
+  // 外部位址、src/ 以外的本機檔案一律擋下；解析失敗一律視為不安全（fail-closed）。
   win.webContents.on('will-navigate', (event, url) => {
-    let protocol = null;
-    try {
-      protocol = new URL(url).protocol;
-    } catch (e) {
-      protocol = null;
-    }
-    if (protocol !== 'file:') {
+    if (!isInsideAppRoot(url)) {
       event.preventDefault();
     }
   });
