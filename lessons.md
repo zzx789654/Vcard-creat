@@ -156,3 +156,23 @@
 - 準則：**保留 CD 的精神（打包前煙霧測試、人工放行、產物完整性），對應到桌面情境**：
   交付物＝安裝檔、「部署」＝發佈 GitHub Release、「人工審核 Gate」＝推版本 tag 這個動作本身、
   「健康檢查」＝打包成功且 artifact 完整。在 workflow 註解寫清楚對應關係，別讓後人以為漏做了 E2E。
+
+## [2026-10-07] 第 3 輪靜態安全檢查 — 發佈後重掃（v1.2.0）
+
+### 本輪檢測紀錄
+- 範圍與工具：產品碼＋scripts＋workflows＋lockfile；Semgrep（7 規則集／400 條）、Bandit、detect-secrets＋git 歷史、npm audit、OSV.dev API；人工審 OWASP 10 類。
+- 弱點統計：Critical 0／High 1／Medium 3／Low 3（共 7），明細見 `SAST.md`。
+- 關鍵指標：漏洞密度 ≈ 3.7／KLOC（含腳本與設定）；Semgrep 誤報率 6.3%；出貨執行期 High CVE 1（Electron）。
+- OWASP Top 10:2025 覆蓋：10／10（A07 不適用）。
+- Exit Criteria：**未達標**（High = 1），G3 退回 Sec 待修補。
+
+### 教訓 / 準則
+**18. 「上次掃過 0 弱點」會過期——相依套件要定期重掃，不只在改程式時掃**
+- 情境：8 月 SCA 為 0 弱點，程式碼沒動，10 月重掃 Electron 與建置工具鏈卻冒出 15 則（High 7）。
+- 準則：CI 加每週排程（`schedule:` cron）重跑 SCA；發佈前一定重跑 `npm audit`／OSV，不沿用舊結果。
+  嚴重度要依「是否進安裝檔」調整：執行期相依照原級處理，建置期相依可下調一級，但仍要修，否則 CI gate 會擋。
+
+**19. CI 本身也是供應鏈：下載的二進位要驗證、Action 要釘選**
+- 情境：`ci.yml` 用 curl 下載 osv-scanner 後直接執行；所有 Action 以 `@v4` 這種可變 tag 參照。
+- 準則：從網路取得的執行檔一律固定版本＋驗 SHA256；第三方 Action 以完整 commit SHA 釘選、容器以 digest 釘選；
+  具 `contents: write` 權限的 workflow（release）優先處理。
