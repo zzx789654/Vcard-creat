@@ -14,8 +14,11 @@
     "build:portable": "electron-builder --win portable --x64"
   },
   "devDependencies": {
-    "electron": "^43.4.0",
-    "electron-builder": "^26.15.3"
+    "electron": "^43.7.8",
+    "electron-builder": "^26.17.0"
+  },
+  "overrides": {
+    "global-agent": "^4.1.3"
   },
   "build": {
     "appId": "com.local.vcard.qrcode",

@@ -164,7 +164,7 @@
 - 弱點統計：Critical 0／High 1／Medium 3／Low 3（共 7），明細見 `SAST.md`。
 - 關鍵指標：漏洞密度 ≈ 3.7／KLOC（含腳本與設定）；Semgrep 誤報率 6.3%；出貨執行期 High CVE 1（Electron）。
 - OWASP Top 10:2025 覆蓋：10／10（A07 不適用）。
-- Exit Criteria：**未達標**（High = 1），G3 退回 Sec 待修補。
+- Exit Criteria：初掃**未達標**（High = 1）；修補 FIND-001／002 後回歸 npm audit／OSV 皆 0，**達標**。
 
 ### 教訓 / 準則
 **18. 「上次掃過 0 弱點」會過期——相依套件要定期重掃，不只在改程式時掃**

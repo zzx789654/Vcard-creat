@@ -29,8 +29,8 @@
 ### 弱點清單（依嚴重度）
 | 編號 | 嚴重度 | 位置 | CWE／OWASP | 說明 | 修補方向 | 狀態 |
 |---|---|---|---|---|---|---|
-| FIND-001 | **High** | `package.json` electron `^43.4.0`（鎖 43.4.0） | CWE-1395／A03 | **出貨執行期**的 Electron 有 4 則 High：GHSA-gr2m-v5gq-v685、GHSA-j84w-jfhq-vhvj、GHSA-9qh4-3jw8-366w、GHSA-qmv3-fv6v-rmhq。本程式已關 webview、拒絕開新視窗、開 sandbox、CSP `connect-src 'none'`，實際可利用性低，但仍屬已知漏洞版本 | 升級至 43.4.1 以上（同 major 最新 43.7.8） | 待修補 |
-| FIND-002 | Medium（工具報 High） | `package-lock.json` 建置工具鏈遞移相依：@xmldom/xmldom、brace-expansion、fast-uri、undici、js-yaml、http-cache-semantics（High）；sprintf-js、global-agent、roarr 等（Moderate） | CWE-1395／A03 | 只在 electron-builder 打包時使用，**不進安裝檔**，故下調一級。但 CI 的 `npm audit --audit-level=high` 會因此**轉紅**，G5 失守 | `npm audit fix`（不加 `--force`，不降級 electron-builder） | 待修補 |
+| FIND-001 | **High** | `package.json` electron `^43.4.0`（鎖 43.4.0） | CWE-1395／A03 | **出貨執行期**的 Electron 有 4 則 High：GHSA-gr2m-v5gq-v685、GHSA-j84w-jfhq-vhvj、GHSA-9qh4-3jw8-366w、GHSA-qmv3-fv6v-rmhq。本程式已關 webview、拒絕開新視窗、開 sandbox、CSP `connect-src 'none'`，實際可利用性低，但仍屬已知漏洞版本 | 升級至 43.4.1 以上（同 major 最新 43.7.8） | ✅ 已修補（見回歸） |
+| FIND-002 | Medium（工具報 High） | `package-lock.json` 建置工具鏈遞移相依：@xmldom/xmldom、brace-expansion、fast-uri、undici、js-yaml、http-cache-semantics（High）；sprintf-js、global-agent、roarr 等（Moderate） | CWE-1395／A03 | 只在 electron-builder 打包時使用，**不進安裝檔**，故下調一級。但 CI 的 `npm audit --audit-level=high` 會因此**轉紅**，G5 失守 | `npm audit fix`（不加 `--force`，不降級 electron-builder） | ✅ 已修補（見回歸） |
 | FIND-003 | Medium | `.github/workflows/ci.yml:129-142` | CWE-494／A08 | 從 GitHub Release 下載 osv-scanner 二進位後**未驗 SHA256** 即執行；若下載來源或傳輸被竄改，會在 CI runner 執行任意程式 | 固定版本號，並以官方 `osv-scanner_SHA256SUMS` 驗 checksum；或改用官方 `google/osv-scanner-action`（以 commit SHA 釘選） | 待修補 |
 | FIND-004 | Medium | `scripts/trust-and-sign.ps1:54-62、70` | CWE-321／A04 | 自簽碼簽憑證的私鑰設成 `-KeyExportPolicy Exportable` 且有效 5 年，憑證又被加入 CurrentUser 的 Root＋TrustedPublisher。同使用者權限的惡意程式可以匯出或直接使用該私鑰，簽出本機會信任的程式 | 改 `NonExportable`；效期縮短（例如 1 年）；文件提醒「只在自己電腦用、用完可從 Root 移除」 | 待修補 |
 | FIND-005 | Low | `ci.yml`、`release.yml` 共 15 處 `uses: …@v4`；容器 `gitleaks:latest`、`semgrep/semgrep` | CWE-829／A03 | Action 與容器以可變 tag 參照，上游被入侵時會自動帶進 CI。`release.yml` 擁有 `contents: write` 權限，影響較大 | 以完整 commit SHA 釘選（註解標版本），容器用 digest | 待修補 |
@@ -61,5 +61,16 @@
 - 相依套件：出貨執行期 High 1（Electron）；建置期 High 6 個套件、Moderate 8
 - OWASP 覆蓋：10／10 類已審（A07 不適用）
 
-### 判定
+### 回歸掃描（2026-10-07，修補 FIND-001／002 後）
+- 觸發：CI run #23 的 `npm audit`（SCA①）與 OSV-Scanner（SCA②）兩個 job 失敗，原因即 FIND-001／002。
+- 修補：
+  - `electron` `^43.4.0` → `^43.7.8`、`electron-builder` `^26.15.3` → `^26.17.0`，並執行 `npm audit fix`（未加 `--force`）。
+  - `sprintf-js` 所有版本都有 GHSA-hp3w-g68c-fv3c，沒有修正版。它的引入路徑是 electron-builder → app-builder-lib → @electron/get → global-agent 3 → roarr，
+    而 global-agent 4.x 已不依賴 roarr，因此在 `package.json` 加 `overrides: { "global-agent": "^4.1.3" }` 讓整條鏈消失。
+    @electron/get 只在設定 `ELECTRON_GET_USE_PROXY` 時呼叫 `require('global-agent').bootstrap()`，4.x 仍提供此 API（已驗證為 function）。
+- 結果：`npm audit` **0**；OSV.dev 查詢 276 套件 **0** 命中；`npm test` 61／61；`npm run verify` 7／7。
+- 限制：本機無法下載 Electron 主程式（proxy TLS 錯誤），打包只驗證到 electron-builder 載入設定與原生相依安裝；完整 Windows 打包以 release workflow 為準。
+- 判定：High = 0，**Exit Criteria 達標**。FIND-003～007（Medium 2／Low 3）仍為建議修補。
+
+### 判定（初掃）
 **未達標**：Exit Criteria「High = 0」不成立（FIND-001），且 CI 的 SCA gate 目前會失敗（FIND-002）。修補 FIND-001、FIND-002 後重跑 SCA 即可回到達標；FIND-003～007 為建議修補。
