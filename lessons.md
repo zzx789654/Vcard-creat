@@ -181,3 +181,9 @@
 **20. 掃描工具標出的問題要改寫法，不要加抑制註解**
 - 情境：新寫的 `osv-check.py` 用 `urllib.request.urlopen`，Bandit B310 警告它可接受 `file:` 等協定。網址明明是常數，很想加 `# nosec`。
 - 準則：換成語意上就只能做安全事情的 API（`http.client.HTTPSConnection` 只走 HTTPS），警告自然消失，日後改動也不會失去保護。
+
+**21. 手動觸發 release 要防「選錯分支」：標籤釘在打包的 commit，並檢查版本號一致**
+- 情境：repo 預設分支是舊的 `claude/...` 分支，「Run workflow」預設選它，連兩次從舊 commit 打包；
+  action-gh-release 未指定 `target_commitish` 時標籤建在預設分支上，v1.2.1 標籤指向舊程式碼，Release 混入 1.0.0 與 1.2.1 兩套安裝檔。
+- 準則：release workflow 一律設 `target_commitish: ${{ github.sha }}`，並在打包前檢查「輸入的版本 = package.json 版本」，不符即失敗；
+  repo 預設分支保持為 main，用完的工作分支即刪。

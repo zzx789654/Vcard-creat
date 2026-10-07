@@ -40,6 +40,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: 版本號一致性檢查（tag 須等於 package.json 的 version）
+        # 防止從錯誤分支打包：舊分支的 package.json 版本不同，會在這裡被擋下，
+        # 不會產出版本號不符的安裝檔，也不會建立指向舊程式碼的標籤。
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          pkg="v$(node -p "require('./package.json').version")"
+          echo "tag=$TAG  package.json=$pkg  ref=$GITHUB_REF  sha=$GITHUB_SHA"
+          if [ "$TAG" != "$pkg" ]; then
+            echo "::error::版本 $TAG 與 package.json 的 $pkg 不符，請確認是從 main 觸發，且已更新 package.json 版本號"
+            exit 1
+          fi
       - run: npm test
       - run: npm run verify
 
@@ -69,6 +81,9 @@ jobs:
         with:
           # tag 推送時用該 tag；手動觸發時用輸入的版本號（此時由 API 建立 tag）
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          # 標籤一律建在「本次打包的 commit」上。未指定時 GitHub 會改用 repo 預設分支，
+          # 預設分支不是 main 時，標籤會指向與安裝檔不符的舊程式碼。
+          target_commitish: ${{ github.sha }}
           files: |
             dist/*.exe
             dist/*.blockmap
