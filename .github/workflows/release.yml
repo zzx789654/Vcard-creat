@@ -36,8 +36,8 @@ jobs:
     name: 打包前煙霧測試（重跑測試 + 反解驗證）
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - name: 版本號一致性檢查（tag 須等於 package.json 的 version）
@@ -65,8 +65,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - name: 安裝相依（含 electron 建置工具）
@@ -77,7 +77,7 @@ jobs:
         # 這裡明確關閉，發佈統一交給下一步的 action-gh-release。
         run: npm run build -- --publish never
       - name: 建立 Release 並附上安裝檔
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           # tag 推送時用該 tag；手動觸發時用輸入的版本號（此時由 API 建立 tag）
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}

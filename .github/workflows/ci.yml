@@ -17,8 +17,8 @@ jobs:
     name: 功能/品質 — 測試與反解驗證
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - name: 語法檢查（產品碼可編譯）
@@ -35,8 +35,8 @@ jobs:
     name: 資安 — 相依套件弱點掃描（SCA）
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - name: 產生 lockfile（僅解析、不下載二進位）
@@ -52,9 +52,9 @@ jobs:
     name: 資安 — 密鑰掃描
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/gitleaks/gitleaks:latest
+      image: ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f  # latest @ 2026-10-09
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Gitleaks（掃描工作區檔案，命中即擋 build）
         run: gitleaks dir . --no-banner --redact --exit-code=1
 
@@ -65,9 +65,9 @@ jobs:
     name: 資安 — 靜態分析 SAST①（Semgrep）
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep
+      image: semgrep/semgrep@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b  # latest @ 2026-10-09
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Semgrep（OWASP Top 10 規則集，僅產品碼）
         run: |
           semgrep --error --severity=ERROR \
@@ -87,14 +87,14 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: CodeQL 初始化（JS/TS + Python + Actions）
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@9f759ee644a3e7c15c1390abf49868036c00067b # v3.38.3
         with:
           languages: javascript-typescript,python,actions
           config-file: ./.github/codeql/codeql-config.yml
       - name: CodeQL 分析（本地產出 SARIF，不上傳）
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@9f759ee644a3e7c15c1390abf49868036c00067b # v3.38.3
         with:
           upload: false
           output: codeql-out
@@ -127,7 +127,7 @@ jobs:
     name: 資安 — 相依套件掃描 SCA②（OSV.dev）
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: OSV.dev（掃 lockfile，偵測到弱點即擋 build）
         run: python3 scripts/osv-check.py package-lock.json
 

@@ -84,6 +84,16 @@ function createWindow() {
   return win;
 }
 
+/** 被封鎖請求的日誌用描述：只留「協定//主機」，解析失敗回固定字樣 */
+function blockedTarget(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol + '//' + parsed.host;
+  } catch (e) {
+    return '(無法解析的網址)';
+  }
+}
+
 /**
  * 攔截所有非 file:// 的請求。
  * 這是「離線運作」的技術保證——即使日後有人不慎加入外部資源，也會被擋下。
@@ -95,7 +105,8 @@ function enforceOffline() {
                     details.url.startsWith('blob:') ||
                     details.url.startsWith('data:');
     if (!isLocal) {
-      console.warn('[offline-guard] 已封鎖對外請求：', details.url);
+      // 只記錄協定與主機：路徑與查詢字串可能夾帶聯絡人資料，不寫進日誌（CWE-532）
+      console.warn('[offline-guard] 已封鎖對外請求：', blockedTarget(details.url));
       return callback({ cancel: true });
     }
     callback({ cancel: false });

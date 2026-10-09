@@ -5,6 +5,79 @@
 
 ---
 
+## [2026-10-09] 第 2 次獨立 SAST — v1.2.1（commit `a8656a2`，main）
+
+### 範圍與標準
+- **範圍**：同上次（產品碼、`scripts/`、`.github/workflows/`、`package-lock.json`）。人工審查聚焦上次掃描後的變更（`0eca8a2..a8656a2`）：
+  `main.js`（`isInsideAppRoot`）、`src/batch.js`（檔案大小上限）、`scripts/osv-check.py`（新增）、`scripts/trust-and-sign.ps1`、`ci.yml`、`release.yml`（版本一致性檢查、`target_commitish`）。
+- **對照**：OWASP Top 10:2025、CWE；Exit Criteria 沿用 `待修改.md`。
+
+### 工具與指令（可重現）
+| 類別 | 工具 | 指令摘要 | 結果 |
+|---|---|---|---|
+| SCA① | npm audit（npm 10.9.8） | `npm audit --json` | **0**（Critical 0／High 0／Moderate 0／Low 0） |
+| SCA② | OSV.dev API | `py -I scripts/osv-check.py package-lock.json` | 261 個套件版本，命中 **0**（exit 0） |
+| SAST | — | **未跑**：本機沒有 Semgrep／Bandit；使用者指定的 sast-studio MCP（上傳 ZIP、掃 repo URL）兩種方式都被本機權限設定擋下 | 改用人工審查（見下） |
+| 資料流 | 人工審查 | 追蹤 URL → `will-navigate`／`setWindowOpenHandler`／`openExternal`；CSV 檔 → `FileReader` | 沒有 High 以上的 source→sink 路徑 |
+| Secret | git grep 金鑰樣式（工作樹＋`git log --all -p`） | AWS／GitHub PAT／Slack／Google API key／私鑰標頭／`password=` 類樣式 | **0**；**未跑 gitleaks**，只是粗篩 |
+| 其他 | grep | 危險 sink（innerHTML、eval、child_process…）、抑制註解 | 產品碼 0；抑制註解 0（`lessons.md` 只有文字提到） |
+
+原始報表：`reports/sast-2026-10-09/`（`npm-audit.json`、`osv.txt`）。
+
+### 人工審查重點
+- `isInsideAppRoot()`：先 `fileURLToPath` 再 `path.relative`，擋 `..`、跨磁碟（會得到絕對路徑）與 `src` 本身；解析失敗會回 false（fail-closed）✅
+- `setWindowOpenHandler`：只把 `https:` 交給 `shell.openExternal`，開新視窗一律 `deny` ✅
+- `release.yml`：`inputs.version` 先放進 `env: TAG`，再在 shell 用 `$TAG` 讀取，沒有直接把 `${{ }}` 內插進 `run:`，不會有 script injection（CWE-78）✅
+- `osv-check.py`：只用 `HTTPSConnection` 連固定主機，任何錯誤都 exit 1 ✅
+- `batch.js`：讀檔前就先檢查 5 MB 上限 ✅
+
+### 弱點清單
+| 編號 | 嚴重度 | 位置 | CWE／OWASP | 說明 | 狀態 |
+|---|---|---|---|---|---|
+| FIND-005 | Low | `ci.yml` 12 處、`release.yml` 5 處 `uses:@vN`；容器 `gitleaks:latest`、`semgrep/semgrep` | CWE-829／A03 | 沿用上次：以可變 tag 參照 | ⏸ 仍保留 |
+
+本輪沒有新增 finding。
+
+### 指標
+- 嚴重度分佈（未關閉）：Critical 0／High 0／Medium 0／Low 1
+- 相依套件：0 個已知漏洞（雙來源結果一致）
+
+### 判定（初掃）
+**資安指標達標，但 G3 證據不完整**：Critical/High = 0、SCA = 0、人工審查沒有新弱點；不過 SAST 工具（Semgrep）與 gitleaks 本輪沒有在本機跑。
+
+### SAST Studio 報告分析（使用者於 2026-10-09 20:01 提供，`git: https://github.com/zzx789654/Vcard-creat`）
+- 報告：semgrep／bearer／trivy／npm_audit／osv_scanner／gitleaks；高 53、中 48、低 9，共 110；判定「阻擋」。
+- **掃到的不是 main**：repo 的預設分支（HEAD）仍是舊的 `claude/vcard-create-migration-xr6nb5`。報告中 electron 43.4.0、@xmldom/xmldom 0.8.14、fast-uri 3.1.5、
+  `ci.yml:133` 的 curl|shell，都是舊分支的內容；main 是 electron 43.7.8、xmldom 0.8.15、fast-uri 3.1.8，curl 早已移除（FIND-001～003）。
+- 逐項對照 main：
+  | 報告項目 | 筆數 | 在 main 上 |
+  |---|---|---|
+  | npm_audit／osv_scanner：electron、xmldom、brace-expansion、fast-uri、undici、js-yaml、http-cache-semantics、sprintf-js、global-agent、roarr 等 | 93 | 不存在（npm audit 0、OSV 0，見上表） |
+  | semgrep `gha-curl-pipe-shell`（ci.yml:133） | 1 | 不存在（FIND-003 已改用 `osv-check.py`） |
+  | semgrep `github-actions-mutable-action-tag` | 15 | **存在** → FIND-005，本輪修補 |
+  | bearer `javascript_lang_logger_leak`（main.js:91） | 1 | **存在** → FIND-008，本輪修補 |
+  | semgrep PartialParsing（ci.yml） | — | 掃的是舊分支的 ci.yml；main 版待下次以工具重掃確認 |
+
+### 新增 finding
+| 編號 | 嚴重度 | 位置 | CWE／OWASP | 說明 | 修補方向 | 狀態 |
+|---|---|---|---|---|---|---|
+| FIND-008 | Low | `main.js` `enforceOffline()` | CWE-532／A09 | 被封鎖的對外請求會把**完整 URL** 寫進 console；若日後有程式錯誤把聯絡人資料放進網址，資料會留在日誌 | 只記錄「協定//主機」 | ✅ 已修補（回歸③） |
+
+### 回歸③（2026-10-09，修補 FIND-005、FIND-008）
+- FIND-005：`ci.yml`（12 處）、`release.yml`（5 處）全部改成完整 commit SHA／映像 digest，行尾註明原版本，大版本不變：
+  checkout v4.4.0 `11d5960a…`、setup-node v4.4.0 `49933ea5…`、codeql-action v3.38.3 `9f759ee6…`、action-gh-release v2.6.2 `3bb12739…`；
+  gitleaks、semgrep 映像改成 `@sha256:` digest（2026-10-09 的 latest）。SHA 以 `git ls-remote --tags` 查各上游 repo 取得（annotated tag 取 `^{}` 指向的 commit），
+  digest 以 `docker buildx imagetools inspect` 取得。檢查：`uses:`／`image:` 沒有釘選的剩 **0** 處。
+- FIND-008：新增 `blockedTarget()`，只輸出 `protocol//host`，無法解析時輸出固定字樣。實測：`https://evil.example.com/a?name=…&tel=…` → `https://evil.example.com`；無效網址 → `(無法解析的網址)`。
+- 回歸：`node --check main.js` OK；`npm test` 61／61；`npm run verify` 7／7。
+- **尚未以工具重掃**：sast-studio MCP 在本機被擋；而且 repo 預設分支沒改回 main 之前，用 URL 掃描仍會掃到舊分支。
+
+### 判定（回歸後）
+main 上已知 finding 全部關閉（Critical 0／High 0／Medium 0／Low 0）。G3 的工具證據要等推送後 CI 綠燈（Semgrep＋Gitleaks＋CodeQL＋SCA 雙來源），
+或預設分支改回 main 之後，再跑一次 SAST Studio 補上。
+
+---
+
 ## [2026-10-07] 第 1 次獨立 SAST — v1.2.0（commit `38a72f7`）
 
 ### 範圍與標準

@@ -187,3 +187,14 @@
   action-gh-release 未指定 `target_commitish` 時標籤建在預設分支上，v1.2.1 標籤指向舊程式碼，Release 混入 1.0.0 與 1.2.1 兩套安裝檔。
 - 準則：release workflow 一律設 `target_commitish: ${{ github.sha }}`，並在打包前檢查「輸入的版本 = package.json 版本」，不符即失敗；
   repo 預設分支保持為 main，用完的工作分支即刪。
+
+## 輪結：第 2 次獨立 SAST（2026-10-09，v1.2.1）
+- 範圍：main `a8656a2`；人工審查聚焦 `0eca8a2..a8656a2` 的變更。
+- 結果：npm audit 0、OSV.dev 0（261 套件）；人工審查沒有新 finding；仍保留 FIND-005（Low）。
+- 缺口：本機沒有 Semgrep／gitleaks；sast-studio MCP 的上傳與 URL 掃描都被本機權限設定擋下 → G3 工具證據待補。
+
+**22. 掃描遠端 repo 前先確認預設分支**
+- 情境：GitHub 預設分支仍是舊的 `claude/...` 分支，用 repo URL 掃描會掃到比 main 落後 5 個 commit 的程式碼。
+- 準則：用 URL 掃描前先 `git ls-remote` 比對 HEAD 與 main；不一致就先把預設分支改回 main，或改掃本機 main。
+- 補記（同日）：使用者提供的 SAST Studio 報告列出 110 筆（High 53），對照後發現掃到的是舊預設分支；main 上只有 FIND-005（Action 未釘選）與 FIND-008（log 寫完整 URL）兩項，都已修補，測試 61/61、反解 7/7。
+- 準則：看到外部掃描報告，先比對報告裡的套件版本／行號是哪個 commit 的，再決定要不要修；不要對已經修好的分支重做一次。
