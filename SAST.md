@@ -76,6 +76,12 @@
 main 上已知 finding 全部關閉（Critical 0／High 0／Medium 0／Low 0）。G3 的工具證據要等推送後 CI 綠燈（Semgrep＋Gitleaks＋CodeQL＋SCA 雙來源），
 或預設分支改回 main 之後，再跑一次 SAST Studio 補上。
 
+### G3 工具證據（2026-10-09）
+- GitHub Actions `ci` run 37927940196（push）、37927947658（pull_request），commit `868fc8d`：Semgrep、CodeQL（JS/TS＋Python＋Actions）、Gitleaks、npm audit、OSV.dev、測試與反解 **全數 success**，Gate G5 job success。
+- 這兩次 run 用的就是本次釘選的 SHA／digest，同時證明釘選後的 workflow 可正常執行。
+- repo 預設分支已改回 `main`（`gh repo edit --default-branch main`）。
+- **判定：G3 達標。**
+
 ---
 
 ## [2026-10-07] 第 1 次獨立 SAST — v1.2.0（commit `38a72f7`）
