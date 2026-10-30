@@ -19,8 +19,9 @@
   var EXPORT_FONT = "'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', sans-serif";
 
   var els = {};
-  // items：成功產生的每一筆 { seq, name, sub, qr }，供單張下載與 ZIP 打包使用
-  var state = { ecc: 'M', csvText: '', fileName: '', items: [], zipping: false };
+  // items：成功產生的每一筆 { seq, name, sub, qr }，供單張下載與 ZIP 打包使用；
+  // itemsFileName：產生這批 items 時的 CSV 檔名（之後換選別的檔也不影響 ZIP 命名）
+  var state = { ecc: 'M', csvText: '', fileName: '', items: [], itemsFileName: '', zipping: false };
 
   function init() {
     cache();
@@ -139,6 +140,7 @@
       truncated = true;
     }
 
+    state.itemsFileName = state.fileName;
     var ok = 0, failed = 0;
     contacts.forEach(function (c, idx) {
       var card = renderCard(c, idx + 1);
@@ -285,32 +287,43 @@
     var cell = cellSize(item.qr, EXPORT_QR_SIZE);
     var width = cell * (item.qr.moduleCount + QUIET_ZONE * 2);
     var margin = cell * QUIET_ZONE;          // 文字左右與 QR 留白對齊
-    var nameSize = Math.round(width / 20);
-    var subSize = Math.round(width / 28);
-    var textHeight = nameSize + (item.sub ? subSize + Math.round(subSize * 0.6) : 0) + margin;
+    var maxTextWidth = width - margin * 2;
+    var nameFont = '600 ' + Math.round(width / 20) + 'px ' + EXPORT_FONT;
+    var subFont = Math.round(width / 28) + 'px ' + EXPORT_FONT;
+    var gap = Math.round(width / 50);
 
     var canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = width + textHeight;
-
     var ctx = canvas.getContext('2d');
+
+    // 先量字形實際的上下緣（中文字形會高出 em 框頂端），再決定畫布高度：
+    // 文字從 QR 完整的 4 格留白之後才開始，留白不能被佔用，否則部分掃描器會找不到 QR
+    var lines = [{ text: item.name, font: nameFont, color: '#000000' }];
+    if (item.sub) lines.push({ text: item.sub, font: subFont, color: '#555555' });
+    var y = width;
+    lines.forEach(function (line, i) {
+      ctx.font = line.font;
+      line.text = fitText(ctx, line.text, maxTextWidth);
+      var m = ctx.measureText(line.text);
+      if (i > 0) y += gap;
+      line.baseline = y + Math.ceil(m.actualBoundingBoxAscent);
+      y = line.baseline + Math.ceil(m.actualBoundingBoxDescent);
+    });
+
+    canvas.width = width;                    // 設定尺寸會重設 ctx 狀態，因此量完才設
+    canvas.height = y + Math.round(margin / 2);
+
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     drawModules(ctx, item.qr, cell);
 
     // 使用者資料以 fillText 畫進點陣圖，不經 HTML 解析
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    var y = width - Math.round(margin / 3);
-    ctx.fillStyle = '#000000';
-    ctx.font = '600 ' + nameSize + 'px ' + EXPORT_FONT;
-    ctx.fillText(fitText(ctx, item.name, width - margin * 2), width / 2, y);
-    if (item.sub) {
-      y += nameSize + Math.round(subSize * 0.6);
-      ctx.fillStyle = '#555555';
-      ctx.font = subSize + 'px ' + EXPORT_FONT;
-      ctx.fillText(fitText(ctx, item.sub, width - margin * 2), width / 2, y);
-    }
+    ctx.textBaseline = 'alphabetic';
+    lines.forEach(function (line) {
+      ctx.font = line.font;
+      ctx.fillStyle = line.color;
+      ctx.fillText(line.text, width / 2, line.baseline);
+    });
     return canvas;
   }
 
@@ -363,7 +376,7 @@
 
     chain.then(function () {
       var zip = ZIP.build(entries);
-      var base = VCard.safeFileName(state.fileName.replace(/\.csv$/i, ''), 'vcard');
+      var base = VCard.safeFileName(state.itemsFileName.replace(/\.csv$/i, ''), 'vcard');
       triggerDownload(new Blob([zip], { type: 'application/zip' }), base + '-qrcode.zip');
       els.summary.textContent = '已打包 ' + entries.length + ' 張 PNG（失敗的資料列不含在內）。';
     }).catch(function () {
