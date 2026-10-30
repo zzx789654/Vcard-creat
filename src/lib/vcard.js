@@ -207,8 +207,13 @@
     return lines.join(CRLF) + CRLF;
   }
 
-  // Windows 保留裝置名稱：直接拿來當檔名會存檔失敗
-  var RESERVED_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  // Windows 保留裝置名稱：直接拿來當檔名會存檔失敗。
+  // Windows 以第一個點之前的部分判斷（CON.backup 也是保留名稱），因此比對到點或結尾為止
+  var RESERVED_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i;
+
+  // 看不見但會改變檔名顯示的字元：DEL、C1 控制字元、零寬字元、雙向控制字元（RLO 等）、BOM。
+  // 不移除的話，CSV 姓名可讓檔名「看起來」是別的副檔名（CWE-451）
+  var INVISIBLE_CHARS = /[\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
 
   /**
    * 把使用者輸入淨化成安全的檔名。
@@ -225,7 +230,9 @@
     if (!base) return fallback;
 
     // 去除路徑分隔符、Windows 非法字元與控制字元（路徑穿越防護）
-    base = base.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 60);
+    base = base.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(INVISIBLE_CHARS, '').slice(0, 60);
+    // 截斷可能切開 emoji 的代理對，去掉結尾落單的高位代理
+    base = base.replace(/[\ud800-\udbff]$/, '');
     // 去除頭尾的點與空白：Windows 不允許，也可避免 "." / ".." 這類名稱
     base = base.replace(/^[.\s]+|[.\s]+$/g, '');
 

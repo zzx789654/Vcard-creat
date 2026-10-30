@@ -15,9 +15,9 @@
 (function (global) {
   'use strict';
 
-  // 未用 ZIP64：檔案數上限 65535，總大小上限 4 GB。
-  // 批次模式單次最多 500 筆、每張 PNG 約數十 KB，遠低於大小上限，因此只檢查檔案數。
+  // 未用 ZIP64：檔案數上限 65535，總大小上限 4 GB
   var MAX_ENTRIES = 0xFFFF;
+  var MAX_SIZE = 0xFFFFFFFF;
   var FLAG_UTF8 = 0x0800;          // general purpose bit 11：檔名為 UTF-8
   var VERSION = 20;                // 2.0：支援資料夾與 UTF-8 檔名旗標
 
@@ -89,10 +89,15 @@
       if (!e || typeof e.name !== 'string' || e.name === '') throw new Error('ZIP_BAD_NAME');
       // 以型別標籤判斷而非 instanceof：資料可能來自另一個 JS 環境（iframe／vm），instanceof 會誤判
       if (Object.prototype.toString.call(e.data) !== '[object Uint8Array]') throw new Error('ZIP_BAD_DATA');
-      // 只接受單層檔名：不允許路徑分隔符，避免解壓時寫到資料夾外（Zip Slip，CWE-22）
-      if (/[\\/]/.test(e.name)) throw new Error('ZIP_BAD_NAME');
-      if (seen['$' + e.name]) throw new Error('ZIP_DUPLICATE_NAME');
-      seen['$' + e.name] = true;
+      // 只接受單層、一般的檔名，不依賴呼叫端先淨化（Zip Slip，CWE-22）：
+      // 不允許路徑分隔符、磁碟代號冒號、控制字元，也不允許頭尾是點或空白（含 "." 與 ".."）
+      if (/[\\/:\x00-\x1f]/.test(e.name) || /^[.\s]|[.\s]$/.test(e.name)) {
+        throw new Error('ZIP_BAD_NAME');
+      }
+      // Windows／macOS 檔案系統不分大小寫，重複比對也不分
+      var key = '$' + e.name.toLowerCase();
+      if (seen[key]) throw new Error('ZIP_DUPLICATE_NAME');
+      seen[key] = true;
     });
   }
 
@@ -102,7 +107,7 @@
     var dt = dosDateTime(isDate ? date : new Date());
 
     var files = entries.map(function (e) {
-      return { name: utf8(e.name), data: e.data, crc: crc32(e.data) };
+      return { name: utf8(e.name), data: e.data };
     });
 
     var localSize = 0, centralSize = 0;
@@ -111,6 +116,9 @@
       centralSize += 46 + f.name.length;
     });
     var total = localSize + centralSize + 22;
+    if (total > MAX_SIZE) throw new Error('ZIP_TOO_LARGE');
+    // 先確認大小再算 CRC：超大輸入在這之前就被擋下，不會白跑整份資料
+    files.forEach(function (f) { f.crc = crc32(f.data); });
 
     var out = new Uint8Array(total);
     var pos = 0;

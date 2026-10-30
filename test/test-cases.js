@@ -254,6 +254,25 @@ function defineTestCases(ctx) {
     assertEqual(VCard.safeFileName('CON2'), 'CON2', 'CON2 非保留名稱');
   });
 
+  test('TC-467 【CWE-451】看不見的控制字元與雙向字元被移除，避免偽造副檔名', function () {
+    assertEqual(VCard.safeFileName('x\u202Egnp.exe'), 'xgnp.exe', 'RLO 應移除');
+    assertEqual(VCard.safeFileName('a\u200Bb\u2066c\uFEFFd\x7Fe\x85f'), 'abcdef', '零寬、隔離、BOM、DEL、C1 應移除');
+    assertEqual(VCard.safeFileName('\u202E\u200B'), 'vcard', '全部被移除時退回預設');
+  });
+
+  test('TC-468 截斷到 60 字時不留下落單的代理字元', function () {
+    var r = VCard.safeFileName('a' + repeat('\uD83D\uDE00', 30));
+    var last = r.charCodeAt(r.length - 1);
+    assert(!(last >= 0xD800 && last <= 0xDBFF), '結尾不應是落單的高位代理');
+    assertEqual(r.length, 59, 'a＋29 個完整 emoji');
+  });
+
+  test('TC-469 Windows 以第一個點前判斷保留名稱', function () {
+    assertEqual(VCard.safeFileName('CON.backup'), '_CON.backup', 'CON.backup 應加前綴');
+    assertEqual(VCard.safeFileName('nul.txt'), '_nul.txt');
+    assertEqual(VCard.safeFileName('CONTACT.list'), 'CONTACT.list', '前綴相同但非保留名稱');
+  });
+
   test('TC-466 Windows 非法字元被替換', function () {
     var r = VCard.safeFileName('a*b?c"d<e>f|g');
     assert(/^[^*?"<>|]+$/.test(r), '非法字元應全部被替換：' + r);
@@ -593,10 +612,25 @@ function defineTestCases(ctx) {
       assertThrows(function () { ZIP.build(many); }, 'ZIP_TOO_MANY');
     });
 
-    test('TC-806 【Zip Slip】檔名含路徑分隔符一律拒絕', function () {
-      assertThrows(function () { ZIP.build([{ name: '../evil.png', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
-      assertThrows(function () { ZIP.build([{ name: '..\\evil.png', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
-      assertThrows(function () { ZIP.build([{ name: 'a/b.png', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
+    test('TC-806 【Zip Slip】檔名含路徑、磁碟代號、控制字元或頭尾點／空白一律拒絕', function () {
+      var bad = ['../evil.png', '..\\evil.png', 'a/b.png', '.', '..', 'C:x.png',
+                 'a\x00.png', 'a\x1f.png', '.hidden', 'a.', ' a.png', 'a.png '];
+      bad.forEach(function (n) {
+        assertThrows(function () { ZIP.build([{ name: n, data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
+      });
+    });
+
+    test('TC-807 重複檔名不分大小寫', function () {
+      assertThrows(function () {
+        ZIP.build([{ name: 'A.png', data: bytesOf([]) }, { name: 'a.png', data: bytesOf([]) }]);
+      }, 'ZIP_DUPLICATE_NAME');
+    });
+
+    test('TC-808 超過 4 GB 上限拒絕（不實際配置記憶體、不先跑 CRC）', function () {
+      // 型別標籤為 Uint8Array、只帶 length 的假物件，模擬超大檔
+      var fake = { length: 0xFFFFFFFF };
+      fake[Symbol.toStringTag] = 'Uint8Array';
+      assertThrows(function () { ZIP.build([{ name: 'big.png', data: fake }]); }, 'ZIP_TOO_LARGE');
     });
   }
 

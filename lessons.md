@@ -198,3 +198,16 @@
 - 準則：用 URL 掃描前先 `git ls-remote` 比對 HEAD 與 main；不一致就先把預設分支改回 main，或改掃本機 main。
 - 補記（同日）：使用者提供的 SAST Studio 報告列出 110 筆（High 53），對照後發現掃到的是舊預設分支；main 上只有 FIND-005（Action 未釘選）與 FIND-008（log 寫完整 URL）兩項，都已修補，測試 61/61、反解 7/7。
 - 準則：看到外部掃描報告，先比對報告裡的套件版本／行號是哪個 commit 的，再決定要不要修；不要對已經修好的分支重做一次。
+
+## 輪結：第 5 輪 FR-10 批次每筆匯出 PNG（2026-10-30，v1.3.0）
+- 交付：卡片單張「下載 PNG」＋「全部下載 PNG（ZIP）」；自寫 stored ZIP（`src/lib/zip.js`），零新增相依。
+- 證據：測試 72/72、反解 7/7；ZIP 經 Python zipfile／unzip 驗證；Playwright 端到端＋從 PNG 像素反解 QR 3/3。
+- 資安：SCA 再度冒出既有相依漏洞（High 2／Moderate 1）→ 升級後 0；獨立審查 Low 2／Info 5 已全修。
+
+**23. 測試 runner 用 vm 載入模組時，型別判斷不要用 instanceof**
+- 情境：`zip.js` 以 `instanceof Uint8Array`／`instanceof Date` 驗證輸入，Node runner 用 `vm` 另開環境載入，測試傳進來的物件來自主環境，全部被判成錯誤型別。
+- 準則：跨環境（vm、iframe）的資料用 `Object.prototype.toString.call(x)` 判斷型別；瀏覽器內同一環境也照樣正確。
+
+**24. 共用模組自己做輸入檢查，不要只靠呼叫端先淨化**
+- 情境：ZIP 檔名目前都先經 `safeFileName`，但模組本身接受 `..`、`C:x`，換個呼叫端就可能出問題。
+- 準則：產出檔名或路徑的模組自己用白名單擋掉危險名稱，並補測試；昂貴計算（CRC）放在大小檢查之後。

@@ -5,6 +5,42 @@
 
 ---
 
+## [2026-10-30] FR-10 批次 PNG／ZIP 匯出 — v1.3.0（分支 `claude/ecstatic-euler-4nxpcw`）
+
+### 範圍與標準
+- **範圍**：新增 `src/lib/zip.js`；修改 `src/batch.js`、`src/batch.html`、`src/styles.css`、`src/lib/vcard.js`（`safeFileName`）；`package-lock.json`。
+- **對照**：OWASP Top 10:2025、CWE；Exit Criteria 見 `待修改.md` 第 5 輪。
+
+### 工具與指令（可重現）
+| 類別 | 工具 | 指令摘要 | 結果 |
+|---|---|---|---|
+| SCA① | npm audit | `npm audit --package-lock-only` | 初掃 High 2／Moderate 1（electron 43.7.8、undici 6.29.0／7.30.0、fast-uri 3.1.8，皆既有相依）→ 修補後 **0** |
+| SCA② | OSV.dev API | `python3 -I scripts/osv-check.py` | 初掃命中 4 個套件版本 → 修補後 261 個套件版本命中 **0** |
+| SAST／Secret | Semgrep、CodeQL、Gitleaks | 本機未安裝，由推送後的 GitHub Actions 執行 | 見 PR 的 CI 結果 |
+| 人工審查 | 獨立子代理（全新脈絡，只讀） | OWASP／CWE 對照：XSS、Zip Slip、ZIP 格式、資源耗盡、網路、CSP、抑制註解、密鑰 | 0 Critical／High／Medium；Low 2、Info 5（下表） |
+| 其他 | grep | innerHTML／eval／抑制註解 | 新程式碼 0 |
+
+原始報表：`reports/sast-2026-10-30/`（`npm-audit.json`、`osv.txt`、`osv-before-fix.txt`）。
+
+### 弱點清單
+| 編號 | 嚴重度 | 位置 | CWE／OWASP | 說明 | 狀態 |
+|---|---|---|---|---|---|
+| FIND-009 | High | `package-lock.json` | CWE-1395／A03 | electron ≤43.8.0、undici（建置工具鏈）已知漏洞 | ✅ electron ^43.8.4、`npm audit fix` |
+| FIND-010 | Medium | `package-lock.json` | CWE-1395／A03 | fast-uri 3.1.8（建置工具鏈） | ✅ 3.1.9 |
+| FIND-011 | Low | `vcard.js` `safeFileName` | CWE-451 | RLO、零寬、C1 等不可見字元可偽造檔名顯示（實際副檔名仍是 .png） | ✅ 移除，TC-467 |
+| FIND-012 | Low | `zip.js` `validate` | CWE-22（縱深） | ZIP 模組接受 `..`、`:`、控制字元、頭尾點／空白（目前呼叫端已淨化，走不到） | ✅ 模組自行拒絕，重複比對不分大小寫，TC-806／807 |
+| FIND-013 | Info | `vcard.js` | — | 截斷 60 字可能切開 emoji 代理對 | ✅ TC-468 |
+| FIND-014 | Info | `vcard.js` | — | `CON.backup` 等含點的保留名稱 | ✅ TC-469 |
+| FIND-015 | Info | `batch.js` | CWE-400 | 打包期間可重新產生，造成打包舊批次 | ✅ 打包時停用產生與選檔 |
+| FIND-016 | Info | `zip.js` | — | 未檢查 4 GB 上限 | ✅ `ZIP_TOO_LARGE`，TC-808 |
+| FIND-017 | Info | `batch.js` | — | object URL 1 秒即釋放，大檔可能來不及 | ✅ 延長為 60 秒 |
+
+### 判定
+- 修補後 Critical 0／High 0／Medium 0／Low 0；測試 72/72、反解 7/7、端到端重跑通過。
+- 工具類 SAST／Secret 以 CI 結果為準，CI 全綠才算過 G3。
+
+---
+
 ## [2026-10-09] 第 2 次獨立 SAST — v1.2.1（commit `a8656a2`，main）
 
 ### 範圍與標準

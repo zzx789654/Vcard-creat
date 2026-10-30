@@ -76,7 +76,8 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    // 大型 ZIP 交給下載程序需要時間，延後一分鐘再釋放
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
   }
 
   // ---------------------------------------------------------------
@@ -338,7 +339,8 @@
   function downloadZip() {
     if (state.zipping || state.items.length === 0) return;
     state.zipping = true;
-    els.downloadZip.disabled = true;
+    // 打包期間鎖住重新產生與換檔，避免打包的是舊批次、進度蓋掉新摘要
+    setBusy(true);
     hideError();
 
     var items = state.items.slice();
@@ -368,8 +370,14 @@
       showError('打包 PNG 失敗，請再試一次。');
     }).then(function () {
       state.zipping = false;
-      els.downloadZip.disabled = state.items.length === 0;
+      setBusy(false);
     });
+  }
+
+  function setBusy(busy) {
+    els.downloadZip.disabled = busy || state.items.length === 0;
+    els.generate.disabled = busy || state.csvText === '';
+    els.csvFile.disabled = busy;
   }
 
   function clearGrid() {
