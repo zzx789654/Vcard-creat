@@ -42,7 +42,7 @@ npm run build:portable   # 只產生免安裝版
 - **容錯等級可調**：L / M / Q / H，資料量與抗污損程度的取捨。
 - **容量提示**：即時顯示資料佔用的位元組與百分比，接近上限會變色警示。
 - **下載**：QRCode 存成 PNG、名片存成 `.vcf`。
-- **批次匯入**：以 CSV 一次匯入多位聯絡人，大量產生 QRCode 並排成可列印總表（見下方）。
+- **批次匯入**：以 CSV 一次匯入多位聯絡人，大量產生 QRCode，可每筆單獨存成 PNG（或全部打包成一個 ZIP），也可排成可列印總表（見下方）。
 - **無障礙**：符合 WCAG 2.1 AA（對比、鍵盤操作、螢幕閱讀器標籤、觸控目標 ≥44px）。
 - **深色模式**：跟隨系統主題自動切換。
 
@@ -55,7 +55,12 @@ npm run build:portable   # 只產生免安裝版
 1. 按「下載 CSV 範本」，得到含欄位標題的 `vcard-批次範本.csv`。
 2. 用 Excel 開啟填好每一列（一列一位聯絡人，欄位沿用單張模式：姓、名、手機、Email…），完成後**另存新檔 → CSV UTF-8**。
 3. 選擇填好的 CSV、選容錯等級，按「產生 QRCode」。
-4. 所有 QR 會排成總表，按「列印 / 存成 PDF」即可輸出。
+4. 所有 QR 會排成總表，可依需要選擇輸出方式：
+   - **全部下載 PNG（ZIP）**：每筆一張 PNG（QRCode＋姓名與公司／職稱），打包成一個 `<CSV 檔名>-qrcode.zip`，只需存一次檔。
+   - **卡片上的「下載 PNG」**：只存那一筆。
+   - **列印 / 存成 PDF**：整張總表輸出。
+
+   PNG 檔名為「三位數序號-姓名.png」（例如 `001-王小明.png`），序號對應 CSV 的第幾筆，同名也不會互相覆蓋；資料過長無法產生的那筆不會放進 ZIP。
 
 - **格式**：採 CSV（零外部相依、完全離線；Excel 可直接另存為 CSV）。標題支援中英文別名，順序可調；無法辨識的欄位會被忽略並提示。
 - **上限**：單次最多 500 筆；空白列自動略過；個別資料過長無法編碼者以紅色卡片標示，不影響其他筆。
@@ -78,6 +83,7 @@ Vcard-creat/
 │   ├── batch.js         批次匯入 UI 控制邏輯
 │   ├── lib/vcard.js     vCard 3.0 產生器（純函式，可獨立測試）
 │   ├── lib/csv.js       CSV 解析與欄位對應（純函式，可獨立測試）
+│   ├── lib/zip.js       批次 PNG 打包成 ZIP（純函式，零外部相依）
 │   └── vendor/qrcode.js 內嵌 QR 編碼器（MIT，無外部相依）
 ├── test/
 │   ├── test-cases.js        測試案例（兩個 runner 共用）
@@ -91,6 +97,8 @@ Vcard-creat/
 │   └── release.yml      持續交付：打包 Windows 安裝檔並發佈 Release
 ├── CoreMain.md          專案中心思想
 ├── SRS.md               需求規格
+├── 架構.md              架構說明（唯一來源）
+├── talk.md              指令與決議紀錄
 └── 待修改.md            開發計畫與關卡狀態
 ```
 
@@ -162,7 +170,7 @@ powershell -ExecutionPolicy Bypass -File test\run-tests.ps1
 發佈新版本：
 
 ```bash
-git tag v1.2.1 && git push origin v1.2.1
+git tag v1.3.0 && git push origin v1.3.0
 ```
 
 ---
@@ -188,7 +196,7 @@ powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1
 
 # 步驟二（每次下載新安裝檔後執行）：簽章該安裝檔並移除「網路來源」標記
 powershell -ExecutionPolicy Bypass -File scripts\trust-and-sign.ps1 `
-  -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.2.1.exe"
+  -ExePath "$HOME\Downloads\vCard QRCode Generator Setup 1.3.0.exe"
 ```
 
 完成後在**你信任過的這台電腦**上執行就不會再跳告警。
