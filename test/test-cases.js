@@ -15,6 +15,7 @@ function defineTestCases(ctx) {
   var assertContains = ctx.assertContains, assertThrows = ctx.assertThrows;
   var repeat = ctx.repeat;
   var VCard = ctx.VCard, QRCodeLib = ctx.QRCodeLib, CSV = ctx.CSV;
+  var ZIP = ctx.ZIP;   // 只有 Node runner 提供（WSH 沒有 Uint8Array）
   // =================================================================
   log('');
   log('--- TC-100 系列：vCard 3.0 結構（FR-03 / AC-03）---');
@@ -486,6 +487,118 @@ function defineTestCases(ctx) {
     }
     assertEqual(forged, 0, 'CSV 內嵌換行不應在 vCard 產生額外屬性行');
   });
+
+  // =================================================================
+  // ZIP 需要 Uint8Array，WSH（JScript）沒有，因此只在 runner 有提供 ZIP 時執行
+  if (ZIP) defineZipCases();
+
+  function defineZipCases() {
+    log('');
+    log('--- TC-800 系列：批次 PNG 打包成 ZIP（FR-10）---');
+
+    function bytesOf(arr) { return new Uint8Array(arr); }
+    function u16(b, p) { return b[p] | (b[p + 1] << 8); }
+    function u32(b, p) { return (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16) | (b[p + 3] << 24)) >>> 0; }
+    function decodeUtf8(b) {
+      var s = '';
+      for (var i = 0; i < b.length; i++) s += '%' + ('0' + b[i].toString(16)).slice(-2);
+      return decodeURIComponent(s);
+    }
+
+    // 獨立的極簡 ZIP 讀取器：從 EOCD → central directory → local header 反推回檔案，
+    // 並逐一檢查 CRC，證明產出的 ZIP 結構可被正確讀回
+    function readZip(b) {
+      var eocd = b.length - 22;
+      assertEqual(u32(b, eocd), 0x06054B50, 'EOCD 簽章');
+      var count = u16(b, eocd + 10);
+      var cdSize = u32(b, eocd + 12);
+      var p = u32(b, eocd + 16);
+      assertEqual(p + cdSize, eocd, 'central directory 應緊接在 EOCD 前');
+      var files = [];
+      for (var i = 0; i < count; i++) {
+        assertEqual(u32(b, p), 0x02014B50, 'central header 簽章');
+        assert((u16(b, p + 8) & 0x0800) !== 0, '應設定 UTF-8 檔名旗標');
+        assertEqual(u16(b, p + 10), 0, '壓縮方法應為 stored');
+        var crc = u32(b, p + 16), size = u32(b, p + 24);
+        var nameLen = u16(b, p + 28), off = u32(b, p + 42);
+        var name = decodeUtf8(b.subarray(p + 46, p + 46 + nameLen));
+        assertEqual(u32(b, off), 0x04034B50, 'local header 簽章');
+        assertEqual(u32(b, off + 14), crc, 'local 與 central 的 CRC 應一致');
+        var dataStart = off + 30 + u16(b, off + 26) + u16(b, off + 28);
+        var data = b.subarray(dataStart, dataStart + size);
+        assertEqual(ZIP.crc32(data), crc, '資料 CRC 應與標頭一致：' + name);
+        files.push({ name: name, data: data, time: u16(b, p + 12), date: u16(b, p + 14) });
+        p += 46 + nameLen + u16(b, p + 30) + u16(b, p + 32);
+      }
+      return files;
+    }
+
+    test('TC-801 CRC32 符合標準測試向量', function () {
+      assertEqual(ZIP.crc32(bytesOf([])), 0, '空資料 CRC 為 0');
+      // "123456789" 的 CRC-32 標準值
+      assertEqual(ZIP.crc32(ZIP.utf8('123456789')), 0xCBF43926, '標準測試向量');
+    });
+
+    test('TC-802 UTF-8 編碼：ASCII、中文、emoji、落單代理字元', function () {
+      assertEqual(Array.prototype.join.call(ZIP.utf8('A'), ','), '65');
+      assertEqual(Array.prototype.join.call(ZIP.utf8('é'), ','), '195,169', '2 位元組字元');
+      assertEqual(Array.prototype.join.call(ZIP.utf8('王'), ','), '231,142,139', '3 位元組字元');
+      assertEqual(Array.prototype.join.call(ZIP.utf8('😀'), ','), '240,159,152,128', '代理對 → 4 位元組');
+      assertEqual(Array.prototype.join.call(ZIP.utf8('\uD800'), ','), '239,191,189', '結尾落單高代理 → U+FFFD');
+      assertEqual(Array.prototype.join.call(ZIP.utf8('\uD800A'), ','), '239,191,189,65', '高代理後非低代理 → U+FFFD');
+      assertEqual(Array.prototype.join.call(ZIP.utf8('\uDC00'), ','), '239,191,189', '落單低代理 → U+FFFD');
+    });
+
+    test('TC-803 多個檔案（含中文檔名）打包後可完整讀回', function () {
+      var a = bytesOf([137, 80, 78, 71, 1, 2, 3]);
+      var b = bytesOf([]);
+      var zip = ZIP.build([
+        { name: '001-王小明.png', data: a },
+        { name: '002-Ming Wang.png', data: b }
+      ], new Date(2026, 9, 30, 14, 25, 36));
+      var files = readZip(zip);
+      assertEqual(files.length, 2, '應有兩個檔案');
+      assertEqual(files[0].name, '001-王小明.png', '中文檔名應原樣讀回');
+      assertEqual(Array.prototype.join.call(files[0].data, ','), '137,80,78,71,1,2,3', '內容應一致');
+      assertEqual(files[1].name, '002-Ming Wang.png');
+      assertEqual(files[1].data.length, 0, '空檔案也能打包');
+      assertEqual(files[0].time, (14 << 11) | (25 << 5) | 18, 'DOS 時間（秒數除以 2）');
+      assertEqual(files[0].date, (46 << 9) | (10 << 5) | 30, 'DOS 日期');
+    });
+
+    test('TC-804 日期邊界：1980 以前、無效日期、2107 以後', function () {
+      var data = [{ name: 'a.png', data: bytesOf([1]) }];
+      var early = readZip(ZIP.build(data, new Date(1970, 0, 1)))[0];
+      assertEqual(early.date, (1 << 5) | 1, '1980 以前寫成 1980-01-01');
+      assertEqual(early.time, 0);
+      var invalid = readZip(ZIP.build(data, new Date(NaN)))[0];
+      assertEqual(invalid.date, (1 << 5) | 1, '無效日期寫成 1980-01-01');
+      var late = readZip(ZIP.build(data, new Date(2200, 0, 1)))[0];
+      assertEqual(late.date >> 9, 127, '年份欄位上限 2107');
+      var now = readZip(ZIP.build(data))[0];
+      assert((now.date >> 9) + 1980 >= 2026, '未給日期時使用現在時間');
+    });
+
+    test('TC-805 【輸入驗證】空清單、錯誤型別、重複檔名一律拒絕', function () {
+      assertThrows(function () { ZIP.build([]); }, 'ZIP_EMPTY');
+      assertThrows(function () { ZIP.build(null); }, 'ZIP_EMPTY');
+      assertThrows(function () { ZIP.build([null]); }, 'ZIP_BAD_NAME');
+      assertThrows(function () { ZIP.build([{ name: '', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
+      assertThrows(function () { ZIP.build([{ name: 'a', data: [1, 2] }]); }, 'ZIP_BAD_DATA');
+      assertThrows(function () {
+        ZIP.build([{ name: 'a', data: bytesOf([]) }, { name: 'a', data: bytesOf([]) }]);
+      }, 'ZIP_DUPLICATE_NAME');
+      var many = [];
+      for (var i = 0; i < 0x10000; i++) many.push({ name: 'f' + i, data: bytesOf([]) });
+      assertThrows(function () { ZIP.build(many); }, 'ZIP_TOO_MANY');
+    });
+
+    test('TC-806 【Zip Slip】檔名含路徑分隔符一律拒絕', function () {
+      assertThrows(function () { ZIP.build([{ name: '../evil.png', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
+      assertThrows(function () { ZIP.build([{ name: '..\\evil.png', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
+      assertThrows(function () { ZIP.build([{ name: 'a/b.png', data: bytesOf([]) }]); }, 'ZIP_BAD_NAME');
+    });
+  }
 
   // =================================================================
   log('');

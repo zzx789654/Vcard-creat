@@ -13,6 +13,7 @@ test/*.log
 # 使用者可能誤存進專案的個資輸出
 *.vcf
 *-qrcode.png
+*-qrcode.zip
 
 # 作業系統
 Thumbs.db

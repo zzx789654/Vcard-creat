@@ -1,7 +1,8 @@
 /**
- * batch.js — 批次匯入控制層：讀 CSV → 逐列組 vCard → 產生 QR → 排成可列印總表。
+ * batch.js — 批次匯入控制層：讀 CSV → 逐列組 vCard → 產生 QR → 排成可列印總表，
+ * 並可把每筆存成單獨的 PNG（單張下載，或全部打包成一個 ZIP）。
  *
- * 沿用既有純函式模組（VCard / CSV / QRCodeLib），本檔只負責 DOM 與流程。
+ * 沿用既有純函式模組（VCard / CSV / QRCodeLib / ZIP），本檔只負責 DOM 與流程。
  * 安全原則：使用者資料一律以 textContent / value 寫入 DOM，全檔不使用 innerHTML。
  * 完全離線：讀檔用 FileReader（本機），不發任何網路請求。
  */
@@ -13,8 +14,13 @@
   var MAX_ROWS = 500;        // 單次批次上限，避免一次算太多造成卡頓
   var MAX_FILE_BYTES = 5 * 1024 * 1024;  // 5 MB：500 列名片遠小於此，超過即拒絕，避免整份讀入卡死視窗
 
+  // 匯出 PNG：QR 在上、姓名與公司／職稱在下
+  var EXPORT_QR_SIZE = 640;  // 與單張模式下載的 PNG 同解析度
+  var EXPORT_FONT = "'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', sans-serif";
+
   var els = {};
-  var state = { ecc: 'M', csvText: '', fileName: '' };
+  // items：成功產生的每一筆 { seq, name, sub, qr }，供單張下載與 ZIP 打包使用
+  var state = { ecc: 'M', csvText: '', fileName: '', items: [], zipping: false };
 
   function init() {
     cache();
@@ -26,6 +32,7 @@
     els.csvFile      = document.getElementById('csv-file');
     els.generate     = document.getElementById('generate');
     els.printSheet   = document.getElementById('print-sheet');
+    els.downloadZip  = document.getElementById('download-zip');
     els.summary      = document.getElementById('batch-summary');
     els.error        = document.getElementById('batch-error');
     els.sheetGrid    = document.getElementById('sheet-grid');
@@ -37,6 +44,7 @@
     els.csvFile.addEventListener('change', onFileChosen);
     els.generate.addEventListener('click', generate);
     els.printSheet.addEventListener('click', function () { window.print(); });
+    els.downloadZip.addEventListener('click', downloadZip);
 
     var segs = document.querySelectorAll('.seg');
     Array.prototype.forEach.call(segs, function (btn) {
@@ -138,6 +146,7 @@
 
     els.sheetEmpty.hidden = true;
     els.printSheet.disabled = ok === 0;
+    els.downloadZip.disabled = ok === 0;
     writeSummary(parsed, ok, failed, truncated);
   }
 
@@ -206,27 +215,37 @@
     nameEl.textContent = name;                 // textContent：不做 HTML 解析（防 XSS）
     card.appendChild(nameEl);
 
+    var sub = subtitle(contact);
     var subEl = document.createElement('div');
     subEl.className = 'qr-card-sub';
-    subEl.textContent = errMsg ? errMsg : subtitle(contact);
+    subEl.textContent = errMsg ? errMsg : sub;
     card.appendChild(subEl);
+
+    if (!errMsg) {
+      var item = { seq: seq, name: name, sub: sub, qr: qr };
+      state.items.push(item);
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary qr-card-download no-print';
+      btn.textContent = '下載 PNG';
+      btn.setAttribute('aria-label', '下載 ' + name + ' 的 PNG');
+      btn.addEventListener('click', function () { downloadOnePng(item); });
+      card.appendChild(btn);
+    }
 
     els.sheetGrid.appendChild(card);
     return { ok: !errMsg };
   }
 
-  function drawQR(canvas, qr) {
-    var ctx = canvas.getContext('2d');
+  /** 每個模組的像素大小：在 pixelSize 內放得下整張 QR（含留白）的最大整數 */
+  function cellSize(qr, pixelSize) {
+    return Math.max(1, Math.floor(pixelSize / (qr.moduleCount + QUIET_ZONE * 2)));
+  }
+
+  /** 從畫布左上角畫 QR 模組（底色由呼叫端先塗白） */
+  function drawModules(ctx, qr, cell) {
     var count = qr.moduleCount;
-    var total = count + QUIET_ZONE * 2;
-    var cell = Math.max(1, Math.floor(QR_PIXEL_SIZE / total));
-    var size = cell * total;
-
-    canvas.width = size;
-    canvas.height = size;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
     ctx.fillStyle = '#000000';
     for (var r = 0; r < count; r++) {
       for (var c = 0; c < count; c++) {
@@ -237,9 +256,127 @@
     }
   }
 
+  function drawQR(canvas, qr) {
+    var cell = cellSize(qr, QR_PIXEL_SIZE);
+    var size = cell * (qr.moduleCount + QUIET_ZONE * 2);
+    canvas.width = size;
+    canvas.height = size;
+
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    drawModules(ctx, qr, cell);
+  }
+
+  // ---------------------------------------------------------------
+  // 匯出 PNG（單張下載與 ZIP 共用同一張畫布）
+  // ---------------------------------------------------------------
+
+  /** 文字超過寬度時從尾端截斷並補「…」 */
+  function fitText(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    var s = text;
+    while (s.length > 0 && ctx.measureText(s + '…').width > maxWidth) s = s.slice(0, -1);
+    return s + '…';
+  }
+
+  function renderExportCanvas(item) {
+    var cell = cellSize(item.qr, EXPORT_QR_SIZE);
+    var width = cell * (item.qr.moduleCount + QUIET_ZONE * 2);
+    var margin = cell * QUIET_ZONE;          // 文字左右與 QR 留白對齊
+    var nameSize = Math.round(width / 20);
+    var subSize = Math.round(width / 28);
+    var textHeight = nameSize + (item.sub ? subSize + Math.round(subSize * 0.6) : 0) + margin;
+
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = width + textHeight;
+
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawModules(ctx, item.qr, cell);
+
+    // 使用者資料以 fillText 畫進點陣圖，不經 HTML 解析
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var y = width - Math.round(margin / 3);
+    ctx.fillStyle = '#000000';
+    ctx.font = '600 ' + nameSize + 'px ' + EXPORT_FONT;
+    ctx.fillText(fitText(ctx, item.name, width - margin * 2), width / 2, y);
+    if (item.sub) {
+      y += nameSize + Math.round(subSize * 0.6);
+      ctx.fillStyle = '#555555';
+      ctx.font = subSize + 'px ' + EXPORT_FONT;
+      ctx.fillText(fitText(ctx, item.sub, width - margin * 2), width / 2, y);
+    }
+    return canvas;
+  }
+
+  /** 檔名：三位數序號（對應 CSV 第幾筆，也避免同名互相覆蓋）＋姓名 */
+  function pngFileName(item) {
+    var seq = ('00' + item.seq).slice(-3);
+    return seq + '-' + VCard.safeFileName(item.name, 'vcard') + '.png';
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (blob) resolve(blob); else reject(new Error('PNG_FAILED'));
+      }, 'image/png');
+    });
+  }
+
+  function downloadOnePng(item) {
+    canvasToBlob(renderExportCanvas(item)).then(function (blob) {
+      triggerDownload(blob, pngFileName(item));
+    }, function () {
+      showError('PNG 匯出失敗，請再試一次。');
+    });
+  }
+
+  function downloadZip() {
+    if (state.zipping || state.items.length === 0) return;
+    state.zipping = true;
+    els.downloadZip.disabled = true;
+    hideError();
+
+    var items = state.items.slice();
+    var entries = [];
+    var done = 0;
+
+    // 一張一張依序轉 PNG，邊做邊更新進度，避免一次佔用大量記憶體
+    var chain = Promise.resolve();
+    items.forEach(function (item) {
+      chain = chain.then(function () {
+        return canvasToBlob(renderExportCanvas(item));
+      }).then(function (blob) {
+        return blob.arrayBuffer();
+      }).then(function (buf) {
+        entries.push({ name: pngFileName(item), data: new Uint8Array(buf) });
+        done++;
+        els.summary.textContent = '正在打包 PNG… ' + done + ' / ' + items.length;
+      });
+    });
+
+    chain.then(function () {
+      var zip = ZIP.build(entries);
+      var base = VCard.safeFileName(state.fileName.replace(/\.csv$/i, ''), 'vcard');
+      triggerDownload(new Blob([zip], { type: 'application/zip' }), base + '-qrcode.zip');
+      els.summary.textContent = '已打包 ' + entries.length + ' 張 PNG（失敗的資料列不含在內）。';
+    }).catch(function () {
+      showError('打包 PNG 失敗，請再試一次。');
+    }).then(function () {
+      state.zipping = false;
+      els.downloadZip.disabled = state.items.length === 0;
+    });
+  }
+
   function clearGrid() {
     while (els.sheetGrid.firstChild) els.sheetGrid.removeChild(els.sheetGrid.firstChild);
+    state.items = [];
     els.printSheet.disabled = true;
+    els.downloadZip.disabled = true;
   }
 
   function showError(msg) {

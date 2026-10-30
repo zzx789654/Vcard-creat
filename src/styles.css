@@ -597,6 +597,9 @@ input[aria-invalid="true"] { border-color: var(--danger); }
   word-break: break-word;
 }
 
+/* 單張下載：寬度跟卡片一致，維持 44px 觸控高度（NFR-04） */
+.qr-card-download { width: 100%; margin-top: auto; font-size: 13px; padding: 8px 10px; }
+
 .qr-card-error { border-color: var(--danger); }
 .qr-card-error .qr-card-sub { color: var(--danger); }
 
